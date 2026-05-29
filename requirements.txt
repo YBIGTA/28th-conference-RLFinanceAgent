@@ -1,0 +1,28 @@
+# ─── KOSPI FinRL + NLP Embedding Pipeline ───────────────────────
+# Core
+yfinance>=0.2.40
+pandas>=2.0
+numpy>=1.24
+scikit-learn>=1.3
+
+# Technical indicators
+stockstats>=0.6
+
+# RL framework
+stable-baselines3[extra]>=2.3
+gymnasium>=0.29
+
+# Google Drive API
+google-api-python-client>=2.100
+google-auth>=2.20
+google-auth-oauthlib>=1.0
+google-auth-httplib2>=0.2
+
+# Serialisation
+pyarrow>=14.0      # parquet support
+
+# Optimisation
+scipy>=1.11
+
+# Plotting
+matplotlib>=3.7
