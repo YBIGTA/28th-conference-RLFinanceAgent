@@ -193,7 +193,7 @@ class RLTrainer:
                 emb_dim=self.emb_dim,
                 initial_capital=self.initial_capital,
                 reward_scaling=1e-4,
-                sharpe_window=20,
+                sharpe_window=0,
             )
         return _factory
 
@@ -274,27 +274,27 @@ class RLTrainer:
     def _plot_portfolio(self, pvs: list, dates: list):
         fig, axes = plt.subplots(2, 1, figsize=(12, 8))
 
-        # ── Portfolio value ──────────────────────────────────────
+        pvs_arr = np.array(pvs)
+        ret_pct = (pvs_arr - self.initial_capital) / self.initial_capital * 100
+
+        # ── 수익률 (%) ───────────────────────────────────────────
         ax1 = axes[0]
-        ax1.plot(pvs, color="#0ea5e9", linewidth=1.5, label="Portfolio")
-        ax1.axhline(self.initial_capital, color="#94a3b8", linestyle="--",
-                    linewidth=1, label="Initial Capital")
-        ax1.set_title(f"KOSPI Portfolio Value — {self.algo.upper()}", fontsize=13)
-        ax1.set_ylabel("Portfolio Value (KRW)")
-        ax1.yaxis.set_major_formatter(
-            plt.FuncFormatter(lambda x, _: f"{x/1e6:.1f}M")
-        )
+        ax1.plot(ret_pct, color="#0ea5e9", linewidth=1.5, label="Portfolio")
+        ax1.axhline(0, color="#94a3b8", linestyle="--", linewidth=1, label="Break-even")
+        ax1.set_title(f"KOSPI Portfolio Return — {self.algo.upper()}", fontsize=13)
+        ax1.set_ylabel("Return (%)")
+        ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.2f}%"))
         ax1.legend()
         ax1.grid(alpha=0.3)
 
         # ── Drawdown ─────────────────────────────────────────────
         ax2 = axes[1]
-        pvs_arr     = np.array(pvs)
         running_max = np.maximum.accumulate(pvs_arr)
         dd          = (pvs_arr - running_max) / (running_max + 1e-8) * 100
         ax2.fill_between(range(len(dd)), dd, 0, color="#ef4444", alpha=0.4, label="Drawdown")
         ax2.set_title("Drawdown (%)", fontsize=13)
         ax2.set_ylabel("Drawdown (%)")
+        ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.2f}%"))
         ax2.legend()
         ax2.grid(alpha=0.3)
 

@@ -70,10 +70,15 @@ class MinVarStrategy:
         balance = self.initial_capital
         shares  = np.zeros(self.n)
 
-        # Equal-weight initial buy at day 0
+        # Equal-weight initial buy at day 0 (유효 종목만)
         prices_0 = self._prices_at(0)
-        shares   = (np.ones(self.n) / self.n * self.initial_capital) / prices_0
-        balance  = self.initial_capital - np.dot(shares, prices_0) * (1 + self.cost)
+        valid_0  = prices_0 > 0
+        n_valid  = valid_0.sum()
+        if n_valid == 0:
+            raise ValueError("day 0에 유효한 가격 데이터가 없습니다.")
+        w0 = valid_0.astype(float) / n_valid
+        shares   = np.where(valid_0, w0 * self.initial_capital / prices_0, 0.0)
+        balance  = self.initial_capital - float(np.dot(shares, prices_0)) * (1 + self.cost)
 
         portfolio_vals: List[float] = []
 
@@ -97,7 +102,7 @@ class MinVarStrategy:
     # ─────────────────────────────────────────────────────────────
     def _prices_at(self, idx: int) -> np.ndarray:
         p = self._price_pivot.iloc[idx].values.astype(float)
-        return np.where(p > 0, p, 1e-8)
+        return np.where(np.isfinite(p) & (p > 0), p, 0.0)  # 0 = 거래 불가
 
     def _rebalance(
         self,
@@ -106,27 +111,47 @@ class MinVarStrategy:
         prices: np.ndarray,
         weights: np.ndarray,
     ):
-        portfolio_val  = balance + float(np.dot(shares, prices))
-        target_shares  = (weights * portfolio_val) / prices
-        delta          = target_shares - shares
-        trade_cost     = float(np.dot(np.abs(delta), prices)) * self.cost
-        balance       -= float(np.dot(delta, prices)) + trade_cost
+        valid = prices > 0
+        portfolio_val = balance + float(np.dot(shares * valid, prices))
+
+        # 유효 종목에만 비중 배분, 재정규화
+        w = weights * valid
+        w_sum = w.sum()
+        w = w / w_sum if w_sum > 1e-8 else (valid.astype(float) / valid.sum())
+
+        target_shares = np.where(valid, w * portfolio_val / prices, 0.0)
+        delta = target_shares - shares
+
+        # 가격이 있는 종목만 거래 비용 계산
+        trade_cost = float(np.dot(np.abs(delta) * valid, prices)) * self.cost
+        balance -= float(np.dot(delta * valid, prices)) + trade_cost
         return balance, target_shares
 
     def _solve_min_var(self, returns: np.ndarray) -> np.ndarray:
-        """Solve min w^T Σ w  s.t. sum(w)=1, w≥0."""
-        cov = np.cov(returns.T) + np.eye(self.n) * 1e-8
-        w0  = np.ones(self.n) / self.n
+        """Solve min w^T Σ w  s.t. sum(w)=1, w≥0. 유효 종목만 사용."""
+        # 분산이 0인 열(가격 변동 없음) 제외
+        valid_cols = returns.std(axis=0) > 1e-8
+        n_valid = valid_cols.sum()
+        w_full = np.zeros(self.n)
+        if n_valid == 0:
+            w_full[:] = 1.0 / self.n
+            return w_full
+
+        r = returns[:, valid_cols]
+        cov = np.cov(r.T) + np.eye(n_valid) * 1e-8
+        w0  = np.ones(n_valid) / n_valid
 
         result = minimize(
             fun=lambda w: w @ cov @ w,
             x0=w0,
             method="SLSQP",
-            bounds=[(0.0, 1.0)] * self.n,
+            bounds=[(0.0, 1.0)] * n_valid,
             constraints=[{"type": "eq", "fun": lambda w: w.sum() - 1}],
             options={"ftol": 1e-12, "maxiter": 1000},
         )
-        return result.x if result.success else w0
+        w_valid = result.x if result.success else w0
+        w_full[valid_cols] = w_valid
+        return w_full
 
 
 # ════════════════════════════════════════════════════════════════
@@ -188,25 +213,24 @@ class Backtester:
         ax1, ax2  = axes
 
         for (name, res), color in zip(results.items(), colors):
-            pvs = np.array(res["portfolio_vals"])
-            ax1.plot(pvs, label=name, color=color, linewidth=1.5)
+            pvs     = np.array(res["portfolio_vals"])
+            ret_pct = (pvs - self.initial_capital) / self.initial_capital * 100
+            ax1.plot(ret_pct, label=name, color=color, linewidth=1.5)
 
             running_max = np.maximum.accumulate(pvs)
             dd = (pvs - running_max) / (running_max + 1e-8) * 100
             ax2.plot(dd, label=name, color=color, linewidth=1.2, alpha=0.85)
 
-        ax1.axhline(self.initial_capital, color="#94a3b8", linestyle="--",
-                    linewidth=1, label="Initial Capital")
-        ax1.set_title("Portfolio Value Comparison", fontsize=13)
-        ax1.set_ylabel("Portfolio Value (KRW)")
-        ax1.yaxis.set_major_formatter(
-            plt.FuncFormatter(lambda x, _: f"{x/1e6:.1f}M")
-        )
+        ax1.axhline(0, color="#94a3b8", linestyle="--", linewidth=1, label="Break-even")
+        ax1.set_title("Portfolio Return Comparison (%)", fontsize=13)
+        ax1.set_ylabel("Return (%)")
+        ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.2f}%"))
         ax1.legend(); ax1.grid(alpha=0.3)
 
         ax2.axhline(0, color="#94a3b8", linestyle="--", linewidth=0.8)
         ax2.set_title("Drawdown (%)", fontsize=13)
         ax2.set_ylabel("Drawdown (%)")
+        ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f"{x:.2f}%"))
         ax2.legend(); ax2.grid(alpha=0.3)
 
         plt.tight_layout()
