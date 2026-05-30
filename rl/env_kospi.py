@@ -69,7 +69,8 @@ class KOSPITradingEnv(gym.Env):
         self,
         df: pd.DataFrame,
         tech_indicators: List[str],
-        emb_dim: int = 768,
+        co_emb_dim: int = 0,
+        mk_emb_dim: int = 0,
         initial_capital: float = 10_000_000,
         max_shares: int = MAX_SHARES_PER_STOCK,
         reward_scaling: float = 1e-4,
@@ -81,7 +82,8 @@ class KOSPITradingEnv(gym.Env):
 
         self.df               = df.sort_values(["date", "tic"]).reset_index(drop=True)
         self.tech_indicators  = tech_indicators
-        self.emb_dim          = emb_dim
+        self.co_emb_dim       = co_emb_dim
+        self.mk_emb_dim       = mk_emb_dim
         self.initial_capital  = initial_capital
         self.max_shares       = max_shares
         self.reward_scaling   = reward_scaling
@@ -94,15 +96,17 @@ class KOSPITradingEnv(gym.Env):
         self.n_stocks      = len(self.tickers)
         self.dates         = sorted(self.df["date"].unique().tolist())
         self.n_tech        = len(tech_indicators)
-        self.emb_cols      = [f"emb_{i}" for i in range(emb_dim)]
+        self.co_emb_cols   = [f"co_emb_{i}" for i in range(co_emb_dim)]
+        self.mk_emb_cols   = [f"mk_emb_{i}" for i in range(mk_emb_dim)]
 
-        # State dim = 1 + n_stocks + n_stocks + n_stocks*n_tech + emb_dim
+        # state = 1 + S + S + S×n_tech + S×co_emb_dim + mk_emb_dim
         self.state_dim = (
             1
             + self.n_stocks
             + self.n_stocks
             + self.n_stocks * self.n_tech
-            + emb_dim
+            + self.n_stocks * co_emb_dim
+            + mk_emb_dim
         )
 
         # ── Gym spaces ───────────────────────────────────────────
@@ -218,15 +222,20 @@ class KOSPITradingEnv(gym.Env):
                 tech[:, j] = data[col].fillna(0).values.astype(np.float32)
         tech_flat = tech.flatten()
 
-        # Embedding (first ticker or market-wide)
-        emb = np.zeros(self.emb_dim, dtype=np.float32)
-        for col in self.emb_cols:
+        # Company embedding: 종목별로 개별 읽기 (n_stocks × co_emb_dim → flatten)
+        co_emb = np.zeros((self.n_stocks, self.co_emb_dim), dtype=np.float32)
+        for j, col in enumerate(self.co_emb_cols):
             if col in data.columns:
-                val = data[col].fillna(0).values
-                idx = int(col.split("_")[1])
-                emb[idx] = float(np.nanmean(val))  # mean across tickers
+                co_emb[:, j] = data[col].fillna(0).values.astype(np.float32)
+        co_emb_flat = co_emb.flatten()
 
-        obs = np.concatenate([bal_ratio, shares_norm, price_norm, tech_flat, emb])
+        # Market embedding: 날짜 공통 벡터 (첫 번째 행 값 사용)
+        mk_emb = np.zeros(self.mk_emb_dim, dtype=np.float32)
+        for j, col in enumerate(self.mk_emb_cols):
+            if col in data.columns:
+                mk_emb[j] = float(data[col].fillna(0).iloc[0])
+
+        obs = np.concatenate([bal_ratio, shares_norm, price_norm, tech_flat, co_emb_flat, mk_emb])
         obs = np.nan_to_num(obs, nan=0.0, posinf=1.0, neginf=-1.0)
         return obs.astype(np.float32)
 

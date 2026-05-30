@@ -67,7 +67,8 @@ class RLTrainer:
         algo: str = "ppo",
         timesteps: int = 100_000,
         output_dir: str = "results/",
-        emb_dim: int = 768,
+        co_emb_dim: int = 0,
+        mk_emb_dim: int = 0,
         hold_threshold: float = 0.10,
     ):
         self.df_train        = df_train
@@ -78,7 +79,8 @@ class RLTrainer:
         self.algo            = algo.lower()
         self.timesteps       = timesteps
         self.output_dir      = Path(output_dir)
-        self.emb_dim         = emb_dim
+        self.co_emb_dim      = co_emb_dim
+        self.mk_emb_dim      = mk_emb_dim
         self.hold_threshold  = hold_threshold
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -159,9 +161,10 @@ class RLTrainer:
 
         # ── Metrics ─────────────────────────────────────────────
         metrics = self._compute_metrics(portfolio_vals)
-        metrics["algorithm"] = self.algo.upper()
-        metrics["n_stocks"]  = self.n_stocks
-        metrics["emb_dim"]   = self.emb_dim
+        metrics["algorithm"]  = self.algo.upper()
+        metrics["n_stocks"]   = self.n_stocks
+        metrics["co_emb_dim"] = self.co_emb_dim
+        metrics["mk_emb_dim"] = self.mk_emb_dim
 
         print("\n  ┌──────────────────────────────────────────┐")
         print(f"  │  Evaluation Results ({self.algo.upper():5s})                │")
@@ -192,7 +195,8 @@ class RLTrainer:
             return KOSPITradingEnv(
                 df=df,
                 tech_indicators=tech,
-                emb_dim=self.emb_dim,
+                co_emb_dim=self.co_emb_dim,
+                mk_emb_dim=self.mk_emb_dim,
                 initial_capital=self.initial_capital,
                 reward_scaling=1e-4,
                 sharpe_window=0,

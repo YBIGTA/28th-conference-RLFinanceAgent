@@ -91,6 +91,8 @@ class StateBuilder:
         self._scaler: Optional[StandardScaler] = None
         self._state_dim: Optional[int] = None
         self._tech_cols: List[str] = []
+        self.co_emb_dim: int = 0
+        self.mk_emb_dim: int = 0
 
     # ─────────────────────────────────────────────────────────────
     @property
@@ -173,30 +175,11 @@ class StateBuilder:
         else:
             mk_emb_cols = []
 
-        # ── 3) 최종 emb_* 컬럼: company + market concat ──────────
-        # env가 단일 emb_* 인터페이스를 유지하도록
-        # 사용 중인 임베딩 종류에 따라 emb_* 로 rename/합산
-        all_emb_sources = []
-        if co_emb_cols:
-            all_emb_sources.append(df[co_emb_cols].values)
-        if mk_emb_cols:
-            all_emb_sources.append(df[mk_emb_cols].values)
-
-        if all_emb_sources:
-            combined = np.concatenate(all_emb_sources, axis=1)
-            # 최종 emb_dim 재정의
-            actual_emb_dim = combined.shape[1]
-            new_emb_cols = [f"emb_{i}" for i in range(actual_emb_dim)]
-            for i, col in enumerate(new_emb_cols):
-                df[col] = combined[:, i]
-            # 실제 emb_dim 업데이트
-            self.emb_dim = actual_emb_dim
-            # 임시 컬럼 정리
-            drop = [c for c in df.columns if c.startswith("co_emb_") or c.startswith("mk_emb_")]
-            df.drop(columns=drop, inplace=True, errors="ignore")
-        else:
-            for c in emb_cols:
-                df[c] = 0.0
+        # ── 3) co_emb_* / mk_emb_* 를 그대로 유지 ───────────────
+        # env가 종목별로 co_emb_* 를 읽고, mk_emb_* 를 broadcast로 읽음
+        self.co_emb_dim = len(co_emb_cols) if co_emb_cols else 0
+        self.mk_emb_dim = len(mk_emb_cols) if mk_emb_cols else 0
+        self.emb_dim    = self.co_emb_dim + self.mk_emb_dim  # 총합 (메트릭용)
 
         return df
 
@@ -220,25 +203,26 @@ class StateBuilder:
         return df
 
     def _compute_state_dim(self, df: pd.DataFrame):
-        n_stocks  = df["tic"].nunique()
-        n_tech    = len(self._tech_cols)
-        # state = balance(1) + shares(S) + price(S) + tech(S×T) + emb(D)
-        self._state_dim = 1 + n_stocks + n_stocks + n_stocks * n_tech + self.emb_dim
+        n_stocks = df["tic"].nunique()
+        n_tech   = len(self._tech_cols)
+        # state = balance(1) + shares(S) + price(S) + tech(S×T)
+        #       + co_emb(S×co_emb_dim) + mk_emb(mk_emb_dim)
+        self._state_dim = (
+            1
+            + n_stocks
+            + n_stocks
+            + n_stocks * n_tech
+            + n_stocks * self.co_emb_dim
+            + self.mk_emb_dim
+        )
 
-        co_used = self.use_company_emb and self.df_embeddings is not None and \
-                  "source_type" in self.df_embeddings.columns and \
-                  (self.df_embeddings["source_type"] == "company").any()
-        mk_used = self.use_market_emb and self.df_embeddings is not None and \
-                  "source_type" in self.df_embeddings.columns and \
-                  (self.df_embeddings["source_type"] == "market").any()
-
-        print(f"\n      ┌─ State 구성 ─────────────────────────────────┐")
-        print(f"      │  balance ratio         :     1")
-        print(f"      │  shares (n={n_stocks})         : {n_stocks:>5}")
-        print(f"      │  prices (n={n_stocks})         : {n_stocks:>5}")
-        print(f"      │  tech indicators       : {n_stocks}×{n_tech} = {n_stocks*n_tech:>4}")
-        emb_label = f"(company={'O' if co_used else 'X'}, market={'O' if mk_used else 'X'})"
-        print(f"      │  text embedding {emb_label}: {self.emb_dim:>5}")
-        print(f"      │  ─────────────────────────────────────────────")
-        print(f"      │  total state_dim       : {self._state_dim:>5}")
-        print(f"      └───────────────────────────────────────────────")
+        print(f"\n      ┌─ State 구성 ──────────────────────────────────────┐")
+        print(f"      │  balance ratio              :      1")
+        print(f"      │  shares        (S={n_stocks:<3})      : {n_stocks:>6}")
+        print(f"      │  prices        (S={n_stocks:<3})      : {n_stocks:>6}")
+        print(f"      │  tech          (S×{n_tech})     : {n_stocks*n_tech:>6}")
+        print(f"      │  co_emb (per-stock S×{self.co_emb_dim:<2})  : {n_stocks*self.co_emb_dim:>6}")
+        print(f"      │  mk_emb (broadcast)         : {self.mk_emb_dim:>6}")
+        print(f"      │  ─────────────────────────────────────────────────")
+        print(f"      │  total state_dim            : {self._state_dim:>6}")
+        print(f"      └───────────────────────────────────────────────────")

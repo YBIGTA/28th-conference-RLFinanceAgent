@@ -106,7 +106,9 @@ def main():
         state_dim=builder.state_dim, n_stocks=len(actual_tickers),
         initial_capital=args.initial_capital,
         algo=args.algo, timesteps=args.timesteps,
-        output_dir=args.output_dir, emb_dim=builder.emb_dim,
+        output_dir=args.output_dir,
+        co_emb_dim=builder.co_emb_dim,
+        mk_emb_dim=builder.mk_emb_dim,
         hold_threshold=args.hold_threshold,
     )
     model = trainer.train()

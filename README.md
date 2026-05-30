@@ -33,19 +33,22 @@ Embeddings/*.jsonl ──► LocalEmbeddingLoader ──► StateBuilder ──�
 매 타임스텝(= 1 영업일)마다 에이전트가 관측하는 벡터:
 
 ```
-[ balance_ratio         ]  1
-[ shares_ratio × S      ]  S       보유 주식 수 / max_shares
-[ price_ratio  × S      ]  S       현재 종가 / 자본 프록시
-[ tech_indicators × S×T ]  S×11    MACD, Bollinger, RSI, CCI, DX, SMA30/60, vol_chg, ret_1d/5d
-[ text_embedding        ]  D       당일 뉴스 임베딩 평균 (stock 16d + market 16d = 32d)
+[ balance_ratio              ]   1
+[ shares_ratio    × S        ]   S        보유 주식 수 / max_shares
+[ price_ratio     × S        ]   S        현재 종가 / 자본 프록시
+[ tech_indicators × S×11     ]   S×11     MACD, Bollinger, RSI, CCI, DX, SMA30/60, vol_chg, ret_1d/5d
+[ co_emb          × S×16     ]   S×16     종목별 뉴스 임베딩 (종목마다 개별 벡터)
+[ mk_emb          × 16       ]   16       시장 전체 뉴스 임베딩 (날짜 공통 벡터)
 
-총 state_dim = 1 + 2S + 11S + D
-예) S=100종목, D=32 → state_dim = 1 + 200 + 1100 + 32 = 1333
+총 state_dim = 1 + 2S + 11S + 16S + 16 = 1 + 29S + 16
+예) S=1  → state_dim =  46
+    S=5  → state_dim = 162
+    S=100 → state_dim = 2917
 ```
 
 임베딩 구조:
-- `emb_0~15` : stock 임베딩 (종목별 뉴스, date × tic join 후 평균)
-- `emb_16~31` : market 임베딩 (시장 전체 뉴스, 날짜별 broadcast)
+- `co_emb_0~15` : stock 임베딩 — 종목별 뉴스, (date, tic) join 후 평균 → **종목마다 개별 벡터**
+- `mk_emb_0~15` : market 임베딩 — 시장 전체 뉴스, 날짜별 broadcast → **모든 종목 공통**
 
 ### Action
 
