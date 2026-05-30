@@ -35,6 +35,8 @@ def parse_args():
     p.add_argument("--algo",      choices=["ppo","a2c","ddpg","td3","sac"], default="ppo")
     p.add_argument("--timesteps", type=int, default=100_000)
     p.add_argument("--initial-capital", type=float, default=10_000_000)
+    p.add_argument("--hold-threshold", type=float, default=0.10,
+                   help="이 값 미만의 |action|은 홀드 처리 (기본: 0.10)")
     p.add_argument("--output-dir", default="results/")
     return p.parse_args()
 
@@ -105,6 +107,7 @@ def main():
         initial_capital=args.initial_capital,
         algo=args.algo, timesteps=args.timesteps,
         output_dir=args.output_dir, emb_dim=builder.emb_dim,
+        hold_threshold=args.hold_threshold,
     )
     model = trainer.train()
 

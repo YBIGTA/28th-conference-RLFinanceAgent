@@ -68,16 +68,18 @@ class RLTrainer:
         timesteps: int = 100_000,
         output_dir: str = "results/",
         emb_dim: int = 768,
+        hold_threshold: float = 0.10,
     ):
-        self.df_train       = df_train
-        self.df_test        = df_test
-        self.state_dim      = state_dim
-        self.n_stocks       = n_stocks
+        self.df_train        = df_train
+        self.df_test         = df_test
+        self.state_dim       = state_dim
+        self.n_stocks        = n_stocks
         self.initial_capital = initial_capital
-        self.algo           = algo.lower()
-        self.timesteps      = timesteps
-        self.output_dir     = Path(output_dir)
-        self.emb_dim        = emb_dim
+        self.algo            = algo.lower()
+        self.timesteps       = timesteps
+        self.output_dir      = Path(output_dir)
+        self.emb_dim         = emb_dim
+        self.hold_threshold  = hold_threshold
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     # ─────────────────────────────────────────────────────────────
@@ -194,6 +196,7 @@ class RLTrainer:
                 initial_capital=self.initial_capital,
                 reward_scaling=1e-4,
                 sharpe_window=0,
+                hold_threshold=self.hold_threshold,
             )
         return _factory
 

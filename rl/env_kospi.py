@@ -75,6 +75,7 @@ class KOSPITradingEnv(gym.Env):
         reward_scaling: float = 1e-4,
         sharpe_window: int = 20,
         turbulence_threshold: float = 140.0,
+        hold_threshold: float = HOLD_THRESHOLD,
     ):
         super().__init__()
 
@@ -85,6 +86,7 @@ class KOSPITradingEnv(gym.Env):
         self.max_shares       = max_shares
         self.reward_scaling   = reward_scaling
         self.sharpe_window    = sharpe_window
+        self.hold_threshold   = hold_threshold
         self.turbulence_threshold = turbulence_threshold
 
         # ── Derived constants ────────────────────────────────────
@@ -236,8 +238,8 @@ class KOSPITradingEnv(gym.Env):
     ):
         """Map continuous actions → discrete buy/sell/hold orders."""
         # Sort: sell first to free up capital, then buy
-        sell_idx = np.where(actions < -HOLD_THRESHOLD)[0]
-        buy_idx  = np.where(actions >  HOLD_THRESHOLD)[0]
+        sell_idx = np.where(actions < -self.hold_threshold)[0]
+        buy_idx  = np.where(actions >  self.hold_threshold)[0]
 
         for i in sell_idx:
             if prices[i] <= 0 or self._shares_held[i] <= 0:
