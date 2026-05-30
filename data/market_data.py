@@ -95,6 +95,12 @@ class KOSPIDataLoader:
             else:
                 df_tic = raw[tic].copy()
 
+            # 최신 yfinance는 MultiIndex 컬럼 반환 → 첫 번째 레벨로 flatten
+            if isinstance(df_tic.columns, pd.MultiIndex):
+                df_tic.columns = df_tic.columns.get_level_values(0)
+
+            # 컬럼명 대소문자 정규화 후 dropna
+            df_tic.columns = [c.capitalize() for c in df_tic.columns]
             df_tic = df_tic.dropna(subset=["Close"])
             df_tic.columns = [c.lower() for c in df_tic.columns]
             df_tic["tic"] = tic
