@@ -95,14 +95,24 @@ class KOSPIDataLoader:
             else:
                 df_tic = raw[tic].copy()
 
-            # 최신 yfinance는 MultiIndex 컬럼 반환 → 첫 번째 레벨로 flatten
+            # MultiIndex 컬럼 flatten: "close"가 있는 레벨을 찾아 사용
             if isinstance(df_tic.columns, pd.MultiIndex):
-                df_tic.columns = df_tic.columns.get_level_values(0)
+                flattened = False
+                for level in range(df_tic.columns.nlevels):
+                    vals = [str(v).lower() for v in df_tic.columns.get_level_values(level)]
+                    if "close" in vals:
+                        df_tic.columns = df_tic.columns.get_level_values(level)
+                        flattened = True
+                        break
+                if not flattened:
+                    df_tic.columns = df_tic.columns.get_level_values(0)
 
-            # 컬럼명 대소문자 정규화 후 dropna
-            df_tic.columns = [c.capitalize() for c in df_tic.columns]
-            df_tic = df_tic.dropna(subset=["Close"])
-            df_tic.columns = [c.lower() for c in df_tic.columns]
+            # 컬럼명 소문자 통일 후 dropna
+            df_tic.columns = [str(c).lower() for c in df_tic.columns]
+            if "close" not in df_tic.columns:
+                print(f"      [warn] {tic}: 'close' 컬럼 없음 ({df_tic.columns.tolist()}), 건너뜀")
+                continue
+            df_tic = df_tic.dropna(subset=["close"])
             df_tic["tic"] = tic
             df_tic.index.name = "date"
             df_tic = df_tic.reset_index()
