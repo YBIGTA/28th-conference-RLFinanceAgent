@@ -195,7 +195,8 @@ class StateBuilder:
     def _scale_features(self, df: pd.DataFrame) -> pd.DataFrame:
         if not self.scale_market:
             return df
-        targets = [c for c in self._tech_cols + ["close", "volume"] if c in df.columns]
+        # close는 env가 자체 정규화(price_ratio)하므로 스케일 제외
+        targets = [c for c in self._tech_cols + ["volume"] if c in df.columns]
         train_mask = df["date"] < self.train_end
         self._scaler = StandardScaler()
         self._scaler.fit(df.loc[train_mask, targets].fillna(0))

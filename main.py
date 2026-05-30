@@ -120,8 +120,10 @@ def main():
     # ── 6. Backtesting 비교 ───────────────────────────────────────
     print("\n[6/6] 전통 전략 비교 (MinVar) …")
     from rl.backtest import Backtester
+    # MinVar는 실제(비정규화) 가격 필요 → df_market 테스트 기간 사용
+    df_market_test = df_market[df_market["date"] >= args.split].copy()
     backtester = Backtester(
-        df_test=df_test,
+        df_test=df_market_test,
         initial_capital=args.initial_capital,
         output_dir=args.output_dir,
     )
