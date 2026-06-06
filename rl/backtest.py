@@ -95,7 +95,7 @@ class MinVarStrategy:
 
             portfolio_vals.append(balance + float(np.dot(shares, prices)))
 
-        metrics = _compute_metrics(portfolio_vals)
+        metrics = _compute_metrics(portfolio_vals, initial_value=self.initial_capital)
         metrics["strategy"] = "MinVar"
         _print_results("MinVar", metrics)
 
@@ -274,12 +274,14 @@ class Backtester:
 # Shared helpers
 # ════════════════════════════════════════════════════════════════
 
-def _compute_metrics(portfolio_vals: list) -> dict:
+def _compute_metrics(portfolio_vals: list, initial_value: float = None) -> dict:
     pvs  = np.array(portfolio_vals, dtype=float)
     rets = np.diff(pvs) / (pvs[:-1] + 1e-8)
 
-    total_ret   = (pvs[-1] - pvs[0]) / pvs[0]
-    annualised  = (1 + total_ret) ** (252 / max(len(pvs), 1)) - 1
+    base        = initial_value if initial_value is not None else pvs[0]
+    total_ret   = (pvs[-1] - base) / base
+    n_days      = max(len(pvs) - 1, 1)   # 구간 수 = 포인트 수 - 1
+    annualised  = (1 + total_ret) ** (252 / n_days) - 1
     sharpe      = (rets.mean() / (rets.std() + 1e-8)) * np.sqrt(252)
     running_max = np.maximum.accumulate(pvs)
     dd          = (pvs - running_max) / (running_max + 1e-8)

@@ -254,8 +254,10 @@ class RLTrainer:
         pvs   = np.array(portfolio_vals, dtype=float)
         rets  = np.diff(pvs) / (pvs[:-1] + 1e-8)
 
-        total_ret   = (pvs[-1] - pvs[0]) / pvs[0]
-        annualised  = (1 + total_ret) ** (252 / max(len(pvs), 1)) - 1
+        base        = pvs[0]  # evaluate()에서 initial_capital이 pvs[0]으로 prepend됨
+        total_ret   = (pvs[-1] - base) / base
+        n_days      = max(len(pvs) - 1, 1)   # 구간 수 = 포인트 수 - 1
+        annualised  = (1 + total_ret) ** (252 / n_days) - 1
         sharpe      = (rets.mean() / (rets.std() + 1e-8)) * np.sqrt(252)
         running_max = np.maximum.accumulate(pvs)
         dd          = (pvs - running_max) / (running_max + 1e-8)
