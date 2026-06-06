@@ -77,7 +77,9 @@ class MinVarStrategy:
         if n_valid == 0:
             raise ValueError("day 0에 유효한 가격 데이터가 없습니다.")
         w0 = valid_0.astype(float) / n_valid
-        shares   = np.where(valid_0, w0 * self.initial_capital / prices_0, 0.0)
+        # 거래비용 포함 예산으로 주식 수 계산 → balance가 음수가 되지 않음
+        budget   = self.initial_capital / (1 + self.cost)
+        shares   = np.where(valid_0, w0 * budget / prices_0, 0.0)
         balance  = self.initial_capital - float(np.dot(shares, prices_0)) * (1 + self.cost)
 
         portfolio_vals: List[float] = []
