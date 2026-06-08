@@ -77,7 +77,9 @@ class MinVarStrategy:
         if n_valid == 0:
             raise ValueError("day 0에 유효한 가격 데이터가 없습니다.")
         w0 = valid_0.astype(float) / n_valid
-        shares   = np.where(valid_0, w0 * self.initial_capital / prices_0, 0.0)
+        # 거래비용 포함 예산으로 주식 수 계산 → balance가 음수가 되지 않음
+        budget   = self.initial_capital / (1 + self.cost)
+        shares   = np.where(valid_0, w0 * budget / prices_0, 0.0)
         balance  = self.initial_capital - float(np.dot(shares, prices_0)) * (1 + self.cost)
 
         portfolio_vals: List[float] = []
@@ -93,7 +95,7 @@ class MinVarStrategy:
 
             portfolio_vals.append(balance + float(np.dot(shares, prices)))
 
-        metrics = _compute_metrics(portfolio_vals)
+        metrics = _compute_metrics(portfolio_vals, initial_value=self.initial_capital)
         metrics["strategy"] = "MinVar"
         _print_results("MinVar", metrics)
 
@@ -272,12 +274,14 @@ class Backtester:
 # Shared helpers
 # ════════════════════════════════════════════════════════════════
 
-def _compute_metrics(portfolio_vals: list) -> dict:
+def _compute_metrics(portfolio_vals: list, initial_value: float = None) -> dict:
     pvs  = np.array(portfolio_vals, dtype=float)
     rets = np.diff(pvs) / (pvs[:-1] + 1e-8)
 
-    total_ret   = (pvs[-1] - pvs[0]) / pvs[0]
-    annualised  = (1 + total_ret) ** (252 / max(len(pvs), 1)) - 1
+    base        = initial_value if initial_value is not None else pvs[0]
+    total_ret   = (pvs[-1] - base) / base
+    n_days      = max(len(pvs) - 1, 1)   # 구간 수 = 포인트 수 - 1
+    annualised  = (1 + total_ret) ** (252 / n_days) - 1
     sharpe      = (rets.mean() / (rets.std() + 1e-8)) * np.sqrt(252)
     running_max = np.maximum.accumulate(pvs)
     dd          = (pvs - running_max) / (running_max + 1e-8)

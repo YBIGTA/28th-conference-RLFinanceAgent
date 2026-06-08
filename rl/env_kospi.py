@@ -263,6 +263,8 @@ class KOSPITradingEnv(gym.Env):
             if prices[i] <= 0:
                 continue
             n_buy = int(abs(actions[i]) * self.max_shares)
+            # max_shares 총 보유량 초과 방지
+            n_buy = min(n_buy, max(0, self.max_shares - int(self._shares_held[i])))
             cost  = n_buy * prices[i] * (1 + KRW_TRANSACTION_COST)
             if cost > self._balance:
                 n_buy = int(self._balance / (prices[i] * (1 + KRW_TRANSACTION_COST)))

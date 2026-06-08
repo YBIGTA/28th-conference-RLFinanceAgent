@@ -139,24 +139,19 @@ class RLTrainer:
         """Run model on test env, compute metrics, save plots."""
         from stable_baselines3.common.vec_env import DummyVecEnv
 
-        test_env_fn = self._make_env(self.df_test)
-        test_env    = DummyVecEnv([test_env_fn])
-        raw_env     = test_env_fn()   # unwrapped for info
-
+        test_env = DummyVecEnv([self._make_env(self.df_test)])
         obs = test_env.reset()
-        portfolio_vals = []
+
+        portfolio_vals = [self.initial_capital]  # day-0 baseline (before first trade)
         dates          = []
 
-        # Reset raw env to collect date info
-        raw_obs, _ = raw_env.reset()
-        done = False
-        while not done:
+        while True:
             action, _ = model.predict(obs, deterministic=True)
-            obs, _, terminated, _ = test_env.step(action)
-            raw_obs, _, done, _, info = raw_env.step(action[0])
+            obs, _, dones, infos = test_env.step(action)
+            info = infos[0]
             portfolio_vals.append(info["portfolio_value"])
             dates.append(info["day"])
-            if terminated[0]:
+            if dones[0]:
                 break
 
         # ── Metrics ─────────────────────────────────────────────
@@ -259,8 +254,10 @@ class RLTrainer:
         pvs   = np.array(portfolio_vals, dtype=float)
         rets  = np.diff(pvs) / (pvs[:-1] + 1e-8)
 
-        total_ret   = (pvs[-1] - pvs[0]) / pvs[0]
-        annualised  = (1 + total_ret) ** (252 / max(len(pvs), 1)) - 1
+        base        = pvs[0]  # evaluate()에서 initial_capital이 pvs[0]으로 prepend됨
+        total_ret   = (pvs[-1] - base) / base
+        n_days      = max(len(pvs) - 1, 1)   # 구간 수 = 포인트 수 - 1
+        annualised  = (1 + total_ret) ** (252 / n_days) - 1
         sharpe      = (rets.mean() / (rets.std() + 1e-8)) * np.sqrt(252)
         running_max = np.maximum.accumulate(pvs)
         dd          = (pvs - running_max) / (running_max + 1e-8)
