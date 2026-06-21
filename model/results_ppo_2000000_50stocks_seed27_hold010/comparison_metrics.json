@@ -1,0 +1,25 @@
+{
+  "RL (PPO)": {
+    "total_return": 1.3086358261093753,
+    "annualised_return": 9.686281574767019,
+    "sharpe_ratio": 2.6433239735138936,
+    "max_drawdown": -0.3990737846036565,
+    "calmar_ratio": 24.271905862390767,
+    "win_rate": 0.33707865168539325,
+    "final_portfolio": 23086358.261093754,
+    "algorithm": "PPO",
+    "n_stocks": 50,
+    "co_emb_dim": 16,
+    "mk_emb_dim": 16
+  },
+  "MinVar": {
+    "total_return": 0.49665234902407157,
+    "annualised_return": 2.132189513256152,
+    "sharpe_ratio": 2.6653520532004285,
+    "max_drawdown": -0.1857012367330335,
+    "calmar_ratio": 11.481826593880736,
+    "win_rate": 0.651685393258427,
+    "final_portfolio": 14966523.490240715,
+    "strategy": "MinVar"
+  }
+}

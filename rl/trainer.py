@@ -209,12 +209,20 @@ class RLTrainer:
         common_kwargs = dict(env=env, verbose=1,
                              tensorboard_log=str(self.output_dir / "tb_logs"))
 
-        if self.algo in ("ppo", "a2c"):
+        if self.algo == "ppo":
             return AlgoCls(
                 "MlpPolicy",
                 learning_rate=3e-4,
-                n_steps=2048 if self.algo == "ppo" else 5,
-                batch_size=64 if self.algo == "ppo" else None,
+                n_steps=2048,
+                batch_size=64,
+                policy_kwargs={"net_arch": [256, 256]},
+                **common_kwargs,
+            )
+        elif self.algo == "a2c":
+            return AlgoCls(
+                "MlpPolicy",
+                learning_rate=3e-4,
+                n_steps=5,
                 policy_kwargs={"net_arch": [256, 256]},
                 **common_kwargs,
             )
