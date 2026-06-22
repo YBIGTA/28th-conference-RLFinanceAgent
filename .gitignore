@@ -1,1 +1,9 @@
 .DS_Store
+__pycache__/
+*.pyc
+results/
+data/
+data/market_data.py
+eval_checkpoints.py
+crawling/*.csv
+crawling/*.txt
