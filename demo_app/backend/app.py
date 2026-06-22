@@ -17,6 +17,7 @@ class InferenceRequest(BaseModel):
     cash: float = 10_000_000
     holdings: Dict[str, int] = Field(default_factory=dict)
     news_text: str = ""
+    crawl_latest: bool = False
 
 
 app = FastAPI(title="RLFinanceAgent Demo API", version="0.1.0")
@@ -45,6 +46,7 @@ def infer(request: InferenceRequest):
             cash=request.cash,
             holdings=request.holdings,
             news_text=request.news_text,
+            crawl_latest=request.crawl_latest,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

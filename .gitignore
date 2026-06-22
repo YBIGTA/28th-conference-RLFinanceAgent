@@ -15,3 +15,7 @@ venv
 node_modules/
 dist/
 .npm-cache/
+
+# News crawler runtime outputs
+news_crawler/output/
+demo_app/backend/runtime/

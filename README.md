@@ -206,7 +206,8 @@ pip install -r requirements.txt
 `demo_app/`은 `feature/demo`의 50종목 best PPO 모델을 서비스하는 FastAPI + 정적 프론트엔드 애플리케이션임.
 
 - 샘플 모드: 모델에 저장된 실제 1,467차원 관측값으로 재현함
-- 최신 모드: 장 마감 후 Yahoo Finance, Upstage, 공용 4,096→16 Autoencoder, PPO를 연결함
+- 최신 모드: 장 마감 후 Yahoo Finance, 네이버 최신 뉴스 크롤러, Upstage, 공용 4,096→16 Autoencoder, PPO를 연결함
+- 뉴스 캐시: 고정 50종목의 `stock_news.csv`와 시장 키워드의 `market_news.csv`를 거래일별로 저장함
 - 출력: 매수·보유·매도 점수, t일 종가 기준 예상 수량, 50종목 전체 표
 - 제외: 실제 증권 주문, 수익 보장, 모델이 제공하지 않는 추천 사유 생성
 
@@ -219,6 +220,7 @@ python -m demo_app.backend.app
 ```
 
 상세 입력 형식과 제약은 [`demo_app/README.md`](demo_app/README.md)에 정리함.
+크롤러 단독 실행 방법은 [`news_crawler/README.md`](news_crawler/README.md)에 정리함.
 
 ---
 

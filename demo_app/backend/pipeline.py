@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
@@ -25,6 +26,7 @@ EMBEDDING_PATH = REPO_ROOT / "Embeddings"
 ARTIFACT_DIR = Path(__file__).resolve().parent / "artifacts"
 SCALER_PATH = ARTIFACT_DIR / "market_scaler.joblib"
 SCALER_META_PATH = ARTIFACT_DIR / "market_scaler.json"
+RUNTIME_DIR = Path(__file__).resolve().parent / "runtime"
 
 TRAIN_START = "2025-01-01"
 TRAIN_END = "2026-01-01"
@@ -129,6 +131,7 @@ class PipelineService:
         cash: float,
         holdings: dict[str, int],
         news_text: str,
+        crawl_latest: bool = False,
     ) -> dict[str, Any]:
         if cash < 0:
             raise ValueError("현금은 0 이상이어야 합니다.")
@@ -139,7 +142,7 @@ class PipelineService:
                 observation, prices, data_date, pipeline = self._sample_observation(cash, holdings_array)
             elif mode == "latest":
                 observation, prices, data_date, pipeline = self._latest_observation(
-                    cash, holdings_array, news_text
+                    cash, holdings_array, news_text, crawl_latest
                 )
             else:
                 raise ValueError("mode는 sample 또는 latest여야 합니다.")
@@ -186,18 +189,42 @@ class PipelineService:
         return observation, prices, "모델 저장 관측값", pipeline
 
     def _latest_observation(
-        self, cash: float, holdings: np.ndarray, news_text: str
+        self,
+        cash: float,
+        holdings: np.ndarray,
+        news_text: str,
+        crawl_latest: bool,
     ) -> tuple[np.ndarray, np.ndarray, str, list[dict[str, str]]]:
         now = datetime.now(KST)
-        if now.weekday() < 5 and (now.hour, now.minute) < (15, 30):
-            raise ValueError("최신 모드는 한국 시장 장 마감(15:30 KST) 이후에 실행할 수 있습니다.")
-
         context = self._prepare_latest_context()
         frame = context["frame"].copy()
         latest_date = context["date"]
+        if (
+            latest_date == now.date().isoformat()
+            and now.weekday() < 5
+            and (now.hour, now.minute) < (15, 30)
+        ):
+            raise ValueError("오늘 데이터는 한국 시장 장 마감(15:30 KST) 이후에 사용할 수 있습니다.")
         embedding_mode = "기존 최신 임베딩"
 
-        live_embeddings = self._build_live_embeddings(news_text, latest_date)
+        market_records: list[dict[str, str]] = []
+        stock_records: list[dict[str, str]] = []
+        if crawl_latest:
+            from news_crawler.service import crawl_latest_news as collect_latest_news
+
+            target_date = datetime.strptime(latest_date, "%Y-%m-%d").date()
+            market_records, stock_records = collect_latest_news(
+                target_date=target_date,
+                tickers=[(ticker, self.names[ticker]) for ticker in self.tickers],
+                cache_dir=RUNTIME_DIR / "news" / latest_date,
+            )
+
+        live_embeddings, embedding_mode = self._build_live_embeddings(
+            news_text,
+            latest_date,
+            market_records=market_records,
+            stock_records=stock_records,
+        )
         if not live_embeddings.empty:
             from data.gdrive_loader import LocalEmbeddingLoader
 
@@ -205,7 +232,6 @@ class PipelineService:
             embeddings = pd.concat([base_embeddings, live_embeddings], ignore_index=True)
             frame, scaler = self._build_state_frame(context["market"], embeddings)
             self._save_scaler(scaler, latest_date)
-            embedding_mode = f"신규 뉴스 {len(live_embeddings)}개"
 
         latest = frame[frame["date"] == latest_date].copy()
         if latest["tic"].nunique() != len(self.tickers):
@@ -281,8 +307,9 @@ class PipelineService:
         return frame, builder._scaler
 
     def _save_scaler(self, scaler: Any, latest_date: str) -> None:
-        ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-        joblib.dump(scaler, SCALER_PATH)
+        runtime_scaler_dir = RUNTIME_DIR / "scaler"
+        runtime_scaler_dir.mkdir(parents=True, exist_ok=True)
+        joblib.dump(scaler, runtime_scaler_dir / "market_scaler.joblib")
         metadata = {
             "train_start": TRAIN_START,
             "train_end_exclusive": TRAIN_END,
@@ -290,12 +317,89 @@ class PipelineService:
             "features": list(getattr(scaler, "feature_names_in_", [])),
             "generated_at": datetime.now(KST).isoformat(),
         }
-        SCALER_META_PATH.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+        (runtime_scaler_dir / "market_scaler.json").write_text(
+            json.dumps(metadata, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
-    def _build_live_embeddings(self, news_text: str, date: str) -> pd.DataFrame:
+    def _build_live_embeddings(
+        self,
+        news_text: str,
+        data_date: str,
+        *,
+        market_records: list[dict[str, str]],
+        stock_records: list[dict[str, str]],
+    ) -> tuple[pd.DataFrame, str]:
+        market_news, stock_news = self._parse_news_input(news_text)
+        market_news.extend(record["title"] for record in market_records if record.get("title"))
+        for record in stock_records:
+            title = record.get("title", "").strip()
+            ticker = _normalise_ticker(record.get("ticker", ""))
+            if title and ticker in self.tickers:
+                stock_news.setdefault(ticker, []).append(title)
+
+        market_news = list(dict.fromkeys(market_news))
+        stock_news = {
+            ticker: list(dict.fromkeys(headlines))
+            for ticker, headlines in stock_news.items()
+        }
+
+        texts: list[str] = []
+        descriptors: list[tuple[str, str]] = []
+        for headline in market_news:
+            texts.append(f"시장 뉴스 | 제목: {headline}")
+            descriptors.append(("market", "__market__"))
+        for ticker, headlines in stock_news.items():
+            for headline in headlines:
+                texts.append(f"회사: {self.names[ticker]} | 제목: {headline}")
+                descriptors.append(("company", ticker))
+        if not texts:
+            return pd.DataFrame(), "기존 최신 임베딩"
+
+        cache_payload = json.dumps(
+            {"texts": texts, "descriptors": descriptors},
+            ensure_ascii=False,
+            sort_keys=True,
+        ).encode("utf-8")
+        digest = hashlib.sha256(cache_payload).hexdigest()[:16]
+        cache_path = RUNTIME_DIR / "embeddings" / f"{data_date}-{digest}.json"
+        if cache_path.exists():
+            cached = pd.read_json(cache_path, orient="records", convert_dates=False)
+            return cached, f"최신 뉴스 {len(texts)}건 · 임베딩 캐시"
+
+        api_key = os.environ.get("UPSTAGE_API_KEY", "").strip()
+        if not api_key or api_key == "XXXXXXX":
+            raise ValueError("최신 뉴스 임베딩을 실행하려면 UPSTAGE_API_KEY가 필요합니다.")
+        client = OpenAI(
+            api_key=api_key,
+            base_url=os.environ.get("UPSTAGE_BASE_URL", "https://api.upstage.ai/v1"),
+        )
+        model_name = os.environ.get("UPSTAGE_EMBEDDING_MODEL", "embedding-passage")
+        response = client.embeddings.create(input=texts, model=model_name)
+        raw = np.asarray([item.embedding for item in response.data], dtype=np.float32)
+        if raw.shape[1] != 4096:
+            raise RuntimeError(f"Upstage embedding dimension is {raw.shape[1]}, expected 4096")
+        with torch.inference_mode():
+            latent = self.encoder(torch.from_numpy(raw)).cpu().numpy()
+
+        rows = []
+        for vector, (source_type, ticker) in zip(latent, descriptors):
+            row: dict[str, Any] = {
+                "date": data_date,
+                "tic": ticker,
+                "source_type": source_type,
+            }
+            row.update({f"emb_{index}": float(value) for index, value in enumerate(vector)})
+            rows.append(row)
+        frame = pd.DataFrame(rows)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_json(cache_path, orient="records", force_ascii=False)
+        return frame, f"최신 뉴스 {len(texts)}건 · 신규 임베딩"
+
+    def _parse_news_input(self, news_text: str) -> tuple[list[str], dict[str, list[str]]]:
         payload = news_text.strip()
         if not payload:
-            return pd.DataFrame()
+            return [], {}
 
         market_news: list[str] = []
         stock_news: dict[str, list[str]] = {}
@@ -315,40 +419,7 @@ class PipelineService:
                 if ticker not in self.tickers:
                     raise ValueError(f"모델 대상이 아닌 뉴스 ticker입니다: {ticker}")
                 stock_news[ticker] = self._normalise_news_list(items)
-
-        texts: list[str] = []
-        descriptors: list[tuple[str, str]] = []
-        for headline in market_news:
-            texts.append(f"시장 뉴스 | 제목: {headline}")
-            descriptors.append(("market", "__market__"))
-        for ticker, headlines in stock_news.items():
-            for headline in headlines:
-                texts.append(f"회사: {self.names[ticker]} | 제목: {headline}")
-                descriptors.append(("company", ticker))
-        if not texts:
-            return pd.DataFrame()
-
-        api_key = os.environ.get("UPSTAGE_API_KEY", "").strip()
-        if not api_key or api_key == "XXXXXXX":
-            raise ValueError("최신 뉴스 임베딩을 실행하려면 UPSTAGE_API_KEY가 필요합니다.")
-        client = OpenAI(
-            api_key=api_key,
-            base_url=os.environ.get("UPSTAGE_BASE_URL", "https://api.upstage.ai/v1"),
-        )
-        model_name = os.environ.get("UPSTAGE_EMBEDDING_MODEL", "embedding-passage")
-        response = client.embeddings.create(input=texts, model=model_name)
-        raw = np.asarray([item.embedding for item in response.data], dtype=np.float32)
-        if raw.shape[1] != 4096:
-            raise RuntimeError(f"Upstage embedding dimension is {raw.shape[1]}, expected 4096")
-        with torch.inference_mode():
-            latent = self.encoder(torch.from_numpy(raw)).cpu().numpy()
-
-        rows = []
-        for vector, (source_type, ticker) in zip(latent, descriptors):
-            row: dict[str, Any] = {"date": date, "tic": ticker, "source_type": source_type}
-            row.update({f"emb_{index}": float(value) for index, value in enumerate(vector)})
-            rows.append(row)
-        return pd.DataFrame(rows)
+        return market_news, stock_news
 
     @staticmethod
     def _normalise_news_list(value: Any) -> list[str]:

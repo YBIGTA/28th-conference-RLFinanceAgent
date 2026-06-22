@@ -58,7 +58,8 @@ export function App() {
   const [mode, setMode] = useState("sample");
   const [cash, setCash] = useState("10000000");
   const [holdingsText, setHoldingsText] = useState("{}");
-  const [newsText, setNewsText] = useState(SAMPLE_NEWS);
+  const [newsText, setNewsText] = useState("");
+  const [autoCrawl, setAutoCrawl] = useState(true);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -79,6 +80,7 @@ export function App() {
           cash: Number(values.cash ?? cash),
           holdings,
           news_text: values.newsText ?? newsText,
+          crawl_latest: selectedMode === "latest" && (values.autoCrawl ?? autoCrawl),
         }),
       });
       const body = await response.json();
@@ -95,7 +97,7 @@ export function App() {
     requestInference("sample", {
       cash: "10000000",
       holdingsText: "{}",
-      newsText: SAMPLE_NEWS,
+      newsText: "",
     });
     // Initial reproducible sample run only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,6 +166,7 @@ export function App() {
           <textarea
             value={newsText}
             onChange={(event) => setNewsText(event.target.value)}
+            placeholder={SAMPLE_NEWS}
             rows={9}
             spellCheck="false"
           />
@@ -221,9 +224,20 @@ export function App() {
         </section>
 
         {mode === "latest" && (
-          <p className="mode-note">
-            최신 모드는 15:30 KST 이후 완료된 t일 데이터로 t+1 추천을 생성합니다.
-          </p>
+          <div className="latest-options">
+            <label className="auto-crawl-option">
+              <input
+                type="checkbox"
+                checked={autoCrawl}
+                onChange={(event) => setAutoCrawl(event.target.checked)}
+              />
+              <span>최신 뉴스 자동 수집</span>
+            </label>
+            <p className="mode-note">
+              15:30 KST 이후 완료된 t일 데이터로 t+1 추천을 생성합니다. 직접 입력한 뉴스는
+              자동 수집 결과에 추가됩니다.
+            </p>
+          </div>
         )}
 
         <button
