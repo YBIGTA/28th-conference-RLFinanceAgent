@@ -5,3 +5,13 @@ __pycache__/
 venv
 .venv
 .venv*
+
+# Python tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Frontend tooling and build outputs
+node_modules/
+dist/
+.npm-cache/

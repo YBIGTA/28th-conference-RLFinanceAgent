@@ -1,0 +1,20 @@
+{
+  "train_start": "2025-01-01",
+  "train_end_exclusive": "2026-01-01",
+  "latest_market_date": "2026-06-22",
+  "features": [
+    "macd",
+    "boll_ub",
+    "boll_lb",
+    "rsi_30",
+    "cci_30",
+    "dx_30",
+    "close_30_sma",
+    "close_60_sma",
+    "volume_change",
+    "return_1d",
+    "return_5d",
+    "volume"
+  ],
+  "generated_at": "2026-06-22T20:41:13.655194+09:00"
+}
