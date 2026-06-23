@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import threading
 from datetime import datetime, timedelta, timezone
@@ -35,6 +36,7 @@ MAX_SHARES = 500
 HOLD_THRESHOLD = 0.10
 TRANSACTION_COST = 0.003
 KST = timezone(timedelta(hours=9))
+LOGGER = logging.getLogger(__name__)
 
 
 def _latest_completed_date_limit(now: datetime) -> str:
@@ -216,14 +218,10 @@ class PipelineService:
 
         market_records: list[dict[str, str]] = []
         stock_records: list[dict[str, str]] = []
+        crawl_failed = False
         if crawl_latest:
-            from news_crawler.service import crawl_latest_news as collect_latest_news
-
-            target_date = datetime.strptime(latest_date, "%Y-%m-%d").date()
-            market_records, stock_records = collect_latest_news(
-                target_date=target_date,
-                tickers=[(ticker, self.names[ticker]) for ticker in self.tickers],
-                cache_dir=RUNTIME_DIR / "news" / latest_date,
+            market_records, stock_records, crawl_failed = self._collect_latest_news(
+                latest_date
             )
 
         live_embeddings, embedding_mode = self._build_live_embeddings(
@@ -232,6 +230,8 @@ class PipelineService:
             market_records=market_records,
             stock_records=stock_records,
         )
+        if crawl_failed:
+            embedding_mode = f"자동 수집 실패 · {embedding_mode}"
         if not live_embeddings.empty:
             from data.gdrive_loader import LocalEmbeddingLoader
 
@@ -268,6 +268,27 @@ class PipelineService:
             {"name": "PPO", "status": "ready", "detail": "1,467 → 50"},
         ]
         return observation, prices, latest_date, pipeline
+
+    def _collect_latest_news(
+        self,
+        latest_date: str,
+    ) -> tuple[list[dict[str, str]], list[dict[str, str]], bool]:
+        from news_crawler.service import crawl_latest_news as collect_latest_news
+
+        target_date = datetime.strptime(latest_date, "%Y-%m-%d").date()
+        try:
+            market_records, stock_records = collect_latest_news(
+                target_date=target_date,
+                tickers=[(ticker, self.names[ticker]) for ticker in self.tickers],
+                cache_dir=RUNTIME_DIR / "news" / latest_date,
+            )
+        except Exception as error:
+            LOGGER.warning(
+                "Latest news crawl failed (%s); using existing embeddings",
+                type(error).__name__,
+            )
+            return [], [], True
+        return market_records, stock_records, False
 
     def _prepare_latest_context(self) -> dict[str, Any]:
         if self._latest_context is not None:

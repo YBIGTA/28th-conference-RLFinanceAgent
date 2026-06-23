@@ -89,6 +89,18 @@ class PipelineServiceTest(unittest.TestCase):
         self.assertIn("임베딩 캐시", second_mode)
         self.assertEqual(openai.return_value.embeddings.create.call_count, 1)
 
+    @patch(
+        "news_crawler.service.crawl_latest_news",
+        side_effect=RuntimeError("Naver returned no news"),
+    )
+    def test_latest_news_crawl_failure_falls_back(self, crawl_latest_news):
+        market, stock, failed = self.service._collect_latest_news("2026-06-22")
+
+        self.assertEqual(market, [])
+        self.assertEqual(stock, [])
+        self.assertTrue(failed)
+        crawl_latest_news.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -118,7 +118,7 @@ gcloud run deploy rlfinanceagent-demo \
 ## 외부 요청과 runtime 캐시
 
 - Yahoo Finance, 네이버 검색, Upstage API는 일반 HTTPS outbound 요청임. Cloud Run은 인터넷 outbound 연결을 지원함.
-- 네이버 검색은 공식 데이터 API가 아닌 HTML 검색 결과를 사용하므로 HTTP 403/429, selector 변경, 공유 egress IP 차단 가능성이 있음. 로컬 샘플 검증 중에도 연속 요청 후 HTTP 403이 발생했으며, 코드는 우회하지 않고 중단함.
+- 네이버 검색은 공식 데이터 API가 아닌 HTML 검색 결과를 사용하므로 HTTP 403/429, selector 변경, 공유 egress IP 차단 가능성이 있음. 로컬 샘플 검증 중에도 연속 요청 후 HTTP 403이 발생했으며, 코드는 우회하지 않고 기존 최신 임베딩으로 fallback함.
 - `demo_app/backend/runtime/`이 비어 있어도 모델과 과거 임베딩은 이미지에 있으므로 샘플 모드와 뉴스 없는 최신 모드는 안전함.
 - runtime 손실 시 최신 뉴스 CSV·Upstage 임베딩·scaler를 다시 생성하므로 결과 손상은 없지만 지연, API 비용, 네이버 재수집 실패 가능성이 생김.
 - 최대 인스턴스를 1로 제한하면 중복 크롤링을 줄일 수 있으나 재시작·재배포 시 캐시는 사라짐. 안정 운영이 필요하면 runtime 캐시를 Cloud Storage 같은 영속 저장소로 이전해야 함.
@@ -128,6 +128,6 @@ gcloud run deploy rlfinanceagent-demo \
 1. Cloud Run 프로젝트, 결제, Artifact Registry와 Secret Manager 준비
 2. 컨테이너 이미지의 실제 압축 크기와 cold start 확인
 3. Cloud Run에서 Yahoo 50종목 다운로드 성공 여부 확인
-4. Cloud Run egress IP에서 네이버 403/429 여부 확인
+4. Cloud Run egress IP에서 네이버 성공 또는 기존 임베딩 fallback 확인
 5. `/api/health` startup probe와 최신 모드 300초 timeout 확인
 6. 공개 URL로 둘 경우 API 호출량·Upstage 비용 제한 추가 검토
