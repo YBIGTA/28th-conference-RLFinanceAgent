@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Dict
 
@@ -28,6 +29,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/api/live")
+def live():
+    return {"status": "alive"}
 
 
 @app.get("/api/health")
@@ -71,4 +77,9 @@ if DIST_DIR.exists():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("demo_app.backend.app:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run(
+        "demo_app.backend.app:app",
+        host=os.environ.get("HOST", "127.0.0.1"),
+        port=int(os.environ.get("PORT", "8000")),
+        reload=False,
+    )

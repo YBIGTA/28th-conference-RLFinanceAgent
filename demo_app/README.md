@@ -22,7 +22,7 @@ python -m demo_app.backend.app
 
 `http://127.0.0.1:8000`에서 확인함.
 
-최신 뉴스 임베딩에는 루트 `.env`의 `UPSTAGE_API_KEY`, `UPSTAGE_BASE_URL`, `UPSTAGE_EMBEDDING_MODEL`을 사용함. 최신 모드의 `최신 뉴스 자동 수집`은 기본 활성화되며, 고정 50종목과 시장 키워드의 해당 거래일 뉴스만 수집함. 수집 CSV와 생성 임베딩은 `demo_app/backend/runtime/`에 캐시하며 Git에는 포함하지 않음.
+최신 뉴스 임베딩에는 루트 `.env`의 `UPSTAGE_API_KEY`, `UPSTAGE_BASE_URL`, `UPSTAGE_EMBEDDING_MODEL`을 사용함. 최신 모드의 `최신 뉴스 자동 수집`은 기본 활성화되며, 고정 50종목과 시장 키워드의 해당 거래일 뉴스만 수집함. 종목명·허용 별칭과 시장 키워드가 제목에 확인되는 기사만 사용함. 수집 CSV와 생성 임베딩은 `demo_app/backend/runtime/`에 캐시하며 Git에는 포함하지 않음.
 
 자동 수집을 끄고 뉴스 입력을 비우면 저장된 최신 16차원 임베딩을 forward-fill함. 직접 입력한 뉴스는 자동 수집 뉴스에 추가함.
 
@@ -40,3 +40,5 @@ python -m demo_app.backend.app
 일반 텍스트를 입력하면 줄마다 시장 뉴스 한 건으로 처리함. 종목 뉴스 ticker는 모델의 고정 50종목만 허용함.
 
 크롤러만 별도로 실행하는 방법은 [`../news_crawler/README.md`](../news_crawler/README.md)에 정리함.
+
+Docker와 Cloud Run 배포 준비는 [`DEPLOYMENT.md`](DEPLOYMENT.md)에 정리함.

@@ -7,7 +7,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from news_crawler.naver import parse_display_date, parse_search_results
-from news_crawler.service import crawl_latest_news
+from news_crawler.service import (
+    _is_market_news_relevant,
+    _is_stock_news_relevant,
+    crawl_latest_news,
+)
 
 
 HTML = """
@@ -53,16 +57,84 @@ class NaverParserTest(unittest.TestCase):
         )
         self.assertEqual(len(records), 1)
 
+    def test_stock_relevance_rejects_unrelated_and_sports_news(self):
+        self.assertTrue(
+            _is_stock_news_relevant(
+                "삼성전자",
+                "삼성전자, 차세대 반도체 투자 확대",
+            )
+        )
+        self.assertTrue(
+            _is_stock_news_relevant(
+                "NAVER",
+                "네이버, AI 검색 서비스 개편",
+            )
+        )
+        self.assertFalse(
+            _is_stock_news_relevant(
+                "KB금융",
+                "안송이, 노련한 핀 공략",
+            )
+        )
+        self.assertFalse(
+            _is_stock_news_relevant(
+                "한화",
+                "한화 7연패 탈출, 투수 호투",
+            )
+        )
+
+    def test_preferred_share_and_parent_company_matching(self):
+        self.assertTrue(
+            _is_stock_news_relevant(
+                "삼성전자우",
+                "삼성전자 우선주 거래량 증가",
+            )
+        )
+        self.assertFalse(
+            _is_stock_news_relevant(
+                "삼성전자우",
+                "삼성전자 신제품 공개",
+            )
+        )
+        self.assertFalse(
+            _is_stock_news_relevant(
+                "HD현대",
+                "HD현대중공업, 신규 수주",
+            )
+        )
+
+    def test_market_relevance_uses_keyword_synonyms(self):
+        self.assertTrue(
+            _is_market_news_relevant(
+                "금리",
+                "국채 금리 상승에 코스피 약세",
+            )
+        )
+        self.assertFalse(
+            _is_market_news_relevant(
+                "중국 경기",
+                "김성현, 골프 대회 2라운드 1위",
+            )
+        )
+
     @patch("news_crawler.service.NaverNewsClient.search")
     def test_crawl_writes_and_reuses_cache(self, search):
-        search.return_value = [
-            {
-                "date": "2026.06.22",
-                "title": "테스트 뉴스",
-                "press": "테스트경제",
-                "source": "naver",
-            }
-        ]
+        def search_result(query, **_kwargs):
+            title = (
+                "코스피 상승 마감"
+                if query == "코스피 증시"
+                else "삼성전자, 반도체 투자 확대"
+            )
+            return [
+                {
+                    "date": "2026.06.22",
+                    "title": title,
+                    "press": "테스트경제",
+                    "source": "naver",
+                }
+            ]
+
+        search.side_effect = search_result
         with tempfile.TemporaryDirectory() as temporary:
             cache_dir = Path(temporary)
             first = crawl_latest_news(

@@ -37,6 +37,13 @@ TRANSACTION_COST = 0.003
 KST = timezone(timedelta(hours=9))
 
 
+def _latest_completed_date_limit(now: datetime) -> str:
+    cutoff = now.date()
+    if now.weekday() < 5 and (now.hour, now.minute) < (15, 30):
+        cutoff -= timedelta(days=1)
+    return cutoff.isoformat()
+
+
 def _load_tickers() -> list[str]:
     tickers: list[str] = []
     for line in TICKER_PATH.read_text(encoding="utf-8").splitlines():
@@ -237,8 +244,8 @@ class PipelineService:
         if latest["tic"].nunique() != len(self.tickers):
             raise RuntimeError("최신 날짜의 50종목 시장 데이터를 완성하지 못했습니다.")
 
+        from data.state_builder import TECH_INDICATORS
         from rl.env_kospi import KOSPITradingEnv
-        from rl.trainer import TECH_INDICATORS
 
         env = KOSPITradingEnv(
             df=latest,
@@ -275,6 +282,11 @@ class PipelineService:
             start=TRAIN_START,
             end=end,
         ).fetch_and_process()
+        market = market[
+            market["date"] <= _latest_completed_date_limit(datetime.now(KST))
+        ].copy()
+        if market.empty:
+            raise RuntimeError("완료된 거래일의 Yahoo 데이터를 찾지 못했습니다.")
         missing = sorted(set(self.tickers) - set(market["tic"].unique()))
         if missing:
             raise RuntimeError(f"Yahoo 데이터가 누락된 종목: {', '.join(missing)}")

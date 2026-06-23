@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -18,6 +19,18 @@ class PipelineServiceTest(unittest.TestCase):
         self.assertEqual(health["observation_dim"], 1467)
         self.assertEqual(health["action_dim"], 50)
         self.assertEqual(health["ticker_mapping"], 50)
+
+    def test_latest_date_limit_excludes_open_market_day(self):
+        before_close = datetime(2026, 6, 23, 9, 0, tzinfo=pipeline.KST)
+        after_close = datetime(2026, 6, 23, 16, 0, tzinfo=pipeline.KST)
+        self.assertEqual(
+            pipeline._latest_completed_date_limit(before_close),
+            "2026-06-22",
+        )
+        self.assertEqual(
+            pipeline._latest_completed_date_limit(after_close),
+            "2026-06-23",
+        )
 
     def test_sample_inference_returns_all_tickers(self):
         result = self.service.infer(
