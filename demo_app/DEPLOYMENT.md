@@ -38,6 +38,7 @@ Cloud Run은 `0.0.0.0`과 지정된 `PORT` 수신을 요구하며, 컨테이너 
 | `UPSTAGE_API_KEY` | 최신 뉴스 사용 시 필수 | 없음 | Secret Manager로 주입 |
 | `UPSTAGE_BASE_URL` | 선택 | `https://api.upstage.ai/v1` | Upstage OpenAI 호환 API |
 | `UPSTAGE_EMBEDDING_MODEL` | 선택 | `embedding-passage` | 4,096차원 임베딩 모델 |
+| `DEMO_PASSWORD` | 필수 | 없음 | 모델 실행 전 공유 비밀번호, Secret Manager로 주입 |
 | `HOST` | 컨테이너에서 필수 | 로컬 `127.0.0.1` | Dockerfile은 `0.0.0.0` 지정 |
 | `PORT` | 선택 | 로컬 `8000` | Dockerfile과 Cloud Run은 `8080` 사용 |
 
@@ -110,10 +111,10 @@ gcloud run deploy rlfinanceagent-demo \
   --max-instances 1 \
   --port 8080 \
   --set-env-vars UPSTAGE_BASE_URL=https://api.upstage.ai/v1,UPSTAGE_EMBEDDING_MODEL=embedding-passage \
-  --set-secrets UPSTAGE_API_KEY=upstage-api-key:1
+  --set-secrets UPSTAGE_API_KEY=upstage-api-key:1,DEMO_PASSWORD=demo-password:1
 ```
 
-`upstage-api-key`는 먼저 Secret Manager에 만들고 서비스 계정에 Secret Accessor 권한을 부여해야 함. 키 원문을 명령행, 이미지, Git에 넣지 않음.
+`upstage-api-key`와 `demo-password`는 먼저 Secret Manager에 만들고 서비스 계정에 Secret Accessor 권한을 부여해야 함. 원문을 명령행, 이미지, Git에 넣지 않음.
 
 ## 외부 요청과 runtime 캐시
 

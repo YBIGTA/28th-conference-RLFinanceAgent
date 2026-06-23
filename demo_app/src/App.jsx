@@ -55,6 +55,9 @@ function Ranking({ title, rows, tone }) {
 }
 
 export function App() {
+  const [authStatus, setAuthStatus] = useState("checking");
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
   const [mode, setMode] = useState("sample");
   const [cash, setCash] = useState("10000000");
   const [holdingsText, setHoldingsText] = useState("{}");
@@ -84,6 +87,7 @@ export function App() {
         }),
       });
       const body = await response.json();
+      if (response.status === 401) setAuthStatus("locked");
       if (!response.ok) throw new Error(body.detail || "추론 요청에 실패했습니다.");
       setResult(body);
     } catch (requestError) {
@@ -94,14 +98,60 @@ export function App() {
   }
 
   useEffect(() => {
-    requestInference("sample", {
-      cash: "10000000",
-      holdingsText: "{}",
-      newsText: "",
-    });
+    async function checkAccess() {
+      try {
+        const response = await fetch("/api/auth");
+        const body = await response.json();
+        if (!body.configured) {
+          setAuthError("서버에 데모 비밀번호가 설정되지 않았습니다.");
+          setAuthStatus("locked");
+          setLoading(false);
+          return;
+        }
+        if (!body.authenticated) {
+          setAuthStatus("locked");
+          setLoading(false);
+          return;
+        }
+        setAuthStatus("ready");
+        await requestInference("sample", {
+          cash: "10000000",
+          holdingsText: "{}",
+          newsText: "",
+        });
+      } catch {
+        setAuthError("접근 상태를 확인하지 못했습니다.");
+        setAuthStatus("locked");
+        setLoading(false);
+      }
+    }
+    checkAccess();
     // Initial reproducible sample run only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function submitPassword(event) {
+    event.preventDefault();
+    setAuthError("");
+    try {
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.detail || "비밀번호를 확인하세요.");
+      setPassword("");
+      setAuthStatus("ready");
+      await requestInference("sample", {
+        cash: "10000000",
+        holdingsText: "{}",
+        newsText: "",
+      });
+    } catch (requestError) {
+      setAuthError(requestError.message || "비밀번호를 확인하세요.");
+    }
+  }
 
   const visibleRows = useMemo(() => {
     const normalisedQuery = query.trim().toLowerCase();
@@ -124,6 +174,37 @@ export function App() {
     const [file] = event.target.files || [];
     if (!file) return;
     setNewsText(await file.text());
+  }
+
+  if (authStatus !== "ready") {
+    return (
+      <div className="auth-shell">
+        <main className="auth-panel">
+          <span className="auth-brand">FinRL Analyst Console</span>
+          <h1>데모 접근</h1>
+          <p>모델을 실행하려면 컨퍼런스 비밀번호를 입력하세요.</p>
+          {authStatus === "checking" ? (
+            <div className="auth-checking">접근 상태 확인 중</div>
+          ) : (
+            <form onSubmit={submitPassword}>
+              <label htmlFor="demo-password">비밀번호</label>
+              <input
+                id="demo-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                autoFocus
+                required
+              />
+              <button type="submit">입장</button>
+            </form>
+          )}
+          {authError && <p className="auth-error">{authError}</p>}
+          <small>연구용 데모 · 실제 투자 주문 아님</small>
+        </main>
+      </div>
+    );
   }
 
   return (

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 from pathlib import Path
 from typing import Dict
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,12 +15,45 @@ from pydantic import BaseModel, Field
 from demo_app.backend.pipeline import get_pipeline_service
 
 
+AUTH_COOKIE = "rlfinance_demo_access"
+AUTH_MAX_AGE_SECONDS = 4 * 60 * 60
+
+
+class AuthRequest(BaseModel):
+    password: str
+
+
 class InferenceRequest(BaseModel):
     mode: str = "sample"
     cash: float = 10_000_000
     holdings: Dict[str, int] = Field(default_factory=dict)
     news_text: str = ""
     crawl_latest: bool = False
+
+
+def _demo_password() -> str:
+    return os.environ.get("DEMO_PASSWORD", "").strip()
+
+
+def _access_token(password: str) -> str:
+    return hmac.new(
+        password.encode("utf-8"),
+        b"rlfinanceagent-demo-access",
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _has_demo_access(request: Request) -> bool:
+    password = _demo_password()
+    supplied = request.cookies.get(AUTH_COOKIE, "")
+    return bool(password) and hmac.compare_digest(supplied, _access_token(password))
+
+
+def _require_demo_access(request: Request) -> None:
+    if not _demo_password():
+        raise HTTPException(status_code=503, detail="데모 비밀번호가 설정되지 않았습니다.")
+    if not _has_demo_access(request):
+        raise HTTPException(status_code=401, detail="데모 비밀번호 인증이 필요합니다.")
 
 
 app = FastAPI(title="RLFinanceAgent Demo API", version="0.1.0")
@@ -44,15 +79,42 @@ def health():
         raise HTTPException(status_code=503, detail=str(error)) from error
 
 
+@app.get("/api/auth")
+def auth_status(request: Request):
+    return {
+        "authenticated": _has_demo_access(request),
+        "configured": bool(_demo_password()),
+    }
+
+
+@app.post("/api/auth")
+def authenticate(payload: AuthRequest, response: Response):
+    password = _demo_password()
+    if not password:
+        raise HTTPException(status_code=503, detail="데모 비밀번호가 설정되지 않았습니다.")
+    if not hmac.compare_digest(payload.password, password):
+        raise HTTPException(status_code=401, detail="비밀번호가 올바르지 않습니다.")
+    response.set_cookie(
+        key=AUTH_COOKIE,
+        value=_access_token(password),
+        max_age=AUTH_MAX_AGE_SECONDS,
+        httponly=True,
+        secure=bool(os.environ.get("K_SERVICE")),
+        samesite="strict",
+    )
+    return {"authenticated": True}
+
+
 @app.post("/api/infer")
-def infer(request: InferenceRequest):
+def infer(payload: InferenceRequest, request: Request):
+    _require_demo_access(request)
     try:
         return get_pipeline_service().infer(
-            mode=request.mode,
-            cash=request.cash,
-            holdings=request.holdings,
-            news_text=request.news_text,
-            crawl_latest=request.crawl_latest,
+            mode=payload.mode,
+            cash=payload.cash,
+            holdings=payload.holdings,
+            news_text=payload.news_text,
+            crawl_latest=payload.crawl_latest,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

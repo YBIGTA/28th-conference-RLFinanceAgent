@@ -19,3 +19,6 @@ dist/
 # News crawler runtime outputs
 news_crawler/output/
 demo_app/backend/runtime/
+
+# Local experiment workspace
+in_vessl/

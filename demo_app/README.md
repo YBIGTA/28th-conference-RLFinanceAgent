@@ -9,6 +9,8 @@
 
 실제 증권 주문은 수행하지 않으며 수량과 금액은 t일 종가 기준 추정치임.
 
+모델 실행은 공유 데모 비밀번호로 보호함. 루트 `.env`에 `DEMO_PASSWORD`를 설정하면 로그인 성공 후 4시간 동안 모델 실행이 허용됨.
+
 ## 실행
 
 ```bash
@@ -41,6 +43,10 @@ python -m demo_app.backend.app
 
 일반 텍스트를 입력하면 줄마다 시장 뉴스 한 건으로 처리함. 종목 뉴스 ticker는 모델의 고정 50종목만 허용함.
 
-크롤러만 별도로 실행하는 방법은 [`../news_crawler/README.md`](../news_crawler/README.md)에 정리함.
+## 관련 문서
 
-Docker와 Cloud Run 배포 준비는 [`DEPLOYMENT.md`](DEPLOYMENT.md)에 정리함.
+- 발표자료 제작용 사실 기준표와 슬라이드 구성: [`docs/PRESENTATION_BRIEF.md`](docs/PRESENTATION_BRIEF.md)
+- 사이트 목적과 주요 기능 소개: [`docs/SITE_OVERVIEW.md`](docs/SITE_OVERVIEW.md)
+- 컨퍼런스 시연, 종목 선정 근거, 학습·추론 파이프라인, 모델 구조: [`docs/CONFERENCE_GUIDE.md`](docs/CONFERENCE_GUIDE.md)
+- 크롤러 단독 실행: [`../news_crawler/README.md`](../news_crawler/README.md)
+- Docker와 Cloud Run 운영: [`DEPLOYMENT.md`](DEPLOYMENT.md)
