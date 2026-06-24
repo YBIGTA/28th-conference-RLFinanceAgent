@@ -17,7 +17,7 @@ from news_crawler.service import (
 HTML = """
 <ul class="list_news">
   <li>
-    <a data-heatmap-target=".tit">삼성전자, 반도체 투자 확대</a>
+    <a data-heatmap-target=".tit" href="https://news.example.com/semiconductor">삼성전자, 반도체 투자 확대</a>
     <div data-sds-comp="Profile"><span>테스트경제</span><span>5분 전</span></div>
   </li>
   <li>
@@ -43,6 +43,7 @@ class NaverParserTest(unittest.TestCase):
         )
         self.assertEqual(len(records), 2)
         self.assertEqual(records[0]["press"], "테스트경제")
+        self.assertEqual(records[0]["link"], "https://news.example.com/semiconductor")
 
     def test_relative_date_uses_crawl_date(self):
         html = """
@@ -129,6 +130,7 @@ class NaverParserTest(unittest.TestCase):
                 {
                     "date": "2026.06.22",
                     "title": title,
+                    "link": "https://news.example.com/article",
                     "press": "테스트경제",
                     "source": "naver",
                 }

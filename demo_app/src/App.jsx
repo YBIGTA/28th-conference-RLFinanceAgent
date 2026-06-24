@@ -69,6 +69,10 @@ export function App() {
   const [query, setQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("전체");
   const [sortDescending, setSortDescending] = useState(true);
+  const [newsDialogOpen, setNewsDialogOpen] = useState(false);
+  const [latestNews, setLatestNews] = useState(null);
+  const [latestNewsLoading, setLatestNewsLoading] = useState(false);
+  const [latestNewsError, setLatestNewsError] = useState("");
 
   async function requestInference(selectedMode, values = {}) {
     setLoading(true);
@@ -174,6 +178,24 @@ export function App() {
     const [file] = event.target.files || [];
     if (!file) return;
     setNewsText(await file.text());
+  }
+
+  async function openLatestNews() {
+    setNewsDialogOpen(true);
+    setLatestNewsLoading(true);
+    setLatestNews(null);
+    setLatestNewsError("");
+    try {
+      const response = await fetch("/api/news/latest");
+      const body = await response.json();
+      if (response.status === 401) setAuthStatus("locked");
+      if (!response.ok) throw new Error(body.detail || "최근 뉴스를 불러오지 못했습니다.");
+      setLatestNews(body);
+    } catch (requestError) {
+      setLatestNewsError(requestError.message || "최근 뉴스를 불러오지 못했습니다.");
+    } finally {
+      setLatestNewsLoading(false);
+    }
   }
 
   if (authStatus !== "ready") {
@@ -394,6 +416,7 @@ export function App() {
               <p>예상 매수 수량은 가용 현금을 양수 action score 비례로 분산한 값입니다.</p>
             </div>
             <div className="table-controls">
+              <button type="button" onClick={openLatestNews}>최근 수집 뉴스</button>
               <input
                 type="search"
                 placeholder="종목명 또는 티커 검색"
@@ -453,6 +476,56 @@ export function App() {
           </footer>
         </section>
       </main>
+
+      {newsDialogOpen && (
+        <div className="news-dialog-backdrop" role="presentation">
+          <section className="news-dialog" role="dialog" aria-modal="true" aria-labelledby="news-dialog-title">
+            <header>
+              <div>
+                <h2 id="news-dialog-title">최근 수집 뉴스</h2>
+                <p>
+                  {latestNews
+                    ? `${latestNews.date} · 시장 ${latestNews.market_count}건 · 종목 ${latestNews.stock_count}건`
+                    : "최신 데이터 모드의 서버 캐시를 조회합니다."}
+                </p>
+              </div>
+              <button type="button" onClick={() => setNewsDialogOpen(false)} aria-label="닫기">닫기</button>
+            </header>
+
+            {latestNewsLoading && <p className="news-dialog-status">불러오는 중</p>}
+            {latestNewsError && <p className="error-message news-dialog-status">{latestNewsError}</p>}
+
+            {latestNews && !latestNewsLoading && (
+              <div className="news-dialog-columns">
+                <section>
+                  <h3>시장 뉴스</h3>
+                  <ul>
+                    {latestNews.market_news.map((item, index) => (
+                      <li key={`market-${index}-${item.title}`}>
+                        <span>{item.keyword || "시장"}</span>
+                        {item.link ? <a href={item.link} target="_blank" rel="noreferrer">{item.title}</a> : <b>{item.title}</b>}
+                        <small>{item.press || item.source || "출처 정보 없음"}</small>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+                <section>
+                  <h3>종목 뉴스</h3>
+                  <ul>
+                    {latestNews.stock_news.map((item, index) => (
+                      <li key={`stock-${index}-${item.ticker}-${item.title}`}>
+                        <span>{item.company || item.ticker || "종목"}</span>
+                        {item.link ? <a href={item.link} target="_blank" rel="noreferrer">{item.title}</a> : <b>{item.title}</b>}
+                        <small>{item.press || item.source || "출처 정보 없음"}</small>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

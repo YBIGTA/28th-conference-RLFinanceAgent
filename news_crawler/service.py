@@ -12,7 +12,7 @@ from typing import Iterable
 from news_crawler.naver import NaverNewsClient
 
 
-COLUMNS = ["date", "company", "ticker", "keyword", "title", "press", "source"]
+COLUMNS = ["date", "company", "ticker", "keyword", "title", "link", "press", "source"]
 DEFAULT_MARKET_KEYWORDS = [
     "코스피",
     "국내 증시",

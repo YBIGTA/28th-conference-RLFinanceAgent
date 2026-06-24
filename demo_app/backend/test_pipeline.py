@@ -106,6 +106,34 @@ class PipelineServiceTest(unittest.TestCase):
 
         self.assertEqual(quantities[0], 1)
 
+    def test_latest_cached_news_uses_newest_available_date(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            news_root = Path(temporary) / "news"
+            older = news_root / "2026-06-22"
+            latest = news_root / "2026-06-23"
+            older.mkdir(parents=True)
+            latest.mkdir(parents=True)
+            (older / "market_news.csv").write_text(
+                "date,title\n2026-06-22,이전 뉴스\n",
+                encoding="utf-8",
+            )
+            (latest / "market_news.csv").write_text(
+                "date,title\n2026-06-23,최신 시장 뉴스\n",
+                encoding="utf-8",
+            )
+            (latest / "stock_news.csv").write_text(
+                "date,company,ticker,title\n2026-06-23,삼성전자,005930,최신 종목 뉴스\n",
+                encoding="utf-8",
+            )
+
+            with patch.object(pipeline, "RUNTIME_DIR", Path(temporary)):
+                result = pipeline.load_latest_cached_news()
+
+        self.assertEqual(result["date"], "2026-06-23")
+        self.assertEqual(result["market_count"], 1)
+        self.assertEqual(result["stock_count"], 1)
+        self.assertEqual(result["market_news"][0]["title"], "최신 시장 뉴스")
+
     def test_crawled_news_embeddings_are_cached(self):
         market_records = [{"title": "코스피 상승 마감"}]
         stock_records = [{"ticker": "005930", "title": "삼성전자 실적 개선"}]

@@ -88,11 +88,16 @@ def parse_search_results(
         if parsed_date != target_date:
             continue
 
+        link = str(title_element.get("href", "")).strip()
+        if not link.startswith(("https://", "http://")):
+            link = ""
+
         seen.add(dedup_key)
         records.append(
             {
                 "date": target_date.strftime("%Y.%m.%d"),
                 "title": title,
+                "link": link,
                 "press": press,
                 "source": "naver",
             }

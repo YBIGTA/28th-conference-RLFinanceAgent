@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from demo_app.backend.pipeline import get_pipeline_service
+from demo_app.backend.pipeline import get_pipeline_service, load_latest_cached_news
 
 
 AUTH_COOKIE = "rlfinance_demo_access"
@@ -120,6 +120,15 @@ def infer(payload: InferenceRequest, request: Request):
         raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@app.get("/api/news/latest")
+def latest_news(request: Request):
+    _require_demo_access(request)
+    try:
+        return load_latest_cached_news()
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 DIST_DIR = Path(__file__).resolve().parents[1] / "dist"

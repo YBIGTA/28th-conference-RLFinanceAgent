@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import logging
@@ -44,6 +45,37 @@ def _latest_completed_date_limit(now: datetime) -> str:
     if now.weekday() < 5 and (now.hour, now.minute) < (15, 30):
         cutoff -= timedelta(days=1)
     return cutoff.isoformat()
+
+
+def load_latest_cached_news() -> dict[str, Any]:
+    news_root = RUNTIME_DIR / "news"
+    if not news_root.exists():
+        raise FileNotFoundError("수집된 뉴스가 없습니다. 최신 데이터 모드를 먼저 실행하세요.")
+
+    def read_records(path: Path) -> list[dict[str, str]]:
+        if not path.exists():
+            return []
+        with path.open("r", encoding="utf-8-sig", newline="") as source:
+            return [
+                {key: value or "" for key, value in row.items()}
+                for row in csv.DictReader(source)
+            ]
+
+    for directory in sorted(news_root.iterdir(), reverse=True):
+        if not directory.is_dir():
+            continue
+        market_news = read_records(directory / "market_news.csv")
+        stock_news = read_records(directory / "stock_news.csv")
+        if market_news or stock_news:
+            return {
+                "date": directory.name,
+                "market_news": market_news,
+                "stock_news": stock_news,
+                "market_count": len(market_news),
+                "stock_count": len(stock_news),
+            }
+
+    raise FileNotFoundError("수집된 뉴스가 없습니다. 최신 데이터 모드를 먼저 실행하세요.")
 
 
 def _allocate_proportional_buys(
