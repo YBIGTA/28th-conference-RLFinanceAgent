@@ -391,7 +391,7 @@ export function App() {
           <div className="results-toolbar">
             <div>
               <h2>전체 50종목 추천</h2>
-              <p>모델 점수만 제공하며 인과적 추천 사유는 생성하지 않습니다.</p>
+              <p>예상 매수 수량은 가용 현금을 양수 action score 비례로 분산한 값입니다.</p>
             </div>
             <div className="table-controls">
               <input

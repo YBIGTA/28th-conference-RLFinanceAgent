@@ -46,6 +46,7 @@ python -m demo_app.backend.app
 ## 관련 문서
 
 - 발표자료 제작용 사실 기준표와 슬라이드 구성: [`docs/PRESENTATION_BRIEF.md`](docs/PRESENTATION_BRIEF.md)
+- 모델 score와 발표용 예상 수량 후처리 구분: [`docs/ALLOCATION_POSTPROCESSING.md`](docs/ALLOCATION_POSTPROCESSING.md)
 - 사이트 목적과 주요 기능 소개: [`docs/SITE_OVERVIEW.md`](docs/SITE_OVERVIEW.md)
 - 컨퍼런스 시연, 종목 선정 근거, 학습·추론 파이프라인, 모델 구조: [`docs/CONFERENCE_GUIDE.md`](docs/CONFERENCE_GUIDE.md)
 - 크롤러 단독 실행: [`../news_crawler/README.md`](../news_crawler/README.md)

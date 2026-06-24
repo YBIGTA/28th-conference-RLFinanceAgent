@@ -46,6 +46,73 @@ def _latest_completed_date_limit(now: datetime) -> str:
     return cutoff.isoformat()
 
 
+def _allocate_proportional_buys(
+    actions: np.ndarray,
+    prices: np.ndarray,
+    holdings: np.ndarray,
+    cash: float,
+) -> tuple[np.ndarray, float]:
+    quantities = np.zeros(len(actions), dtype=int)
+    remaining_cash = max(float(cash), 0.0)
+    candidates = [
+        int(index)
+        for index in np.where(actions > HOLD_THRESHOLD)[0]
+        if prices[index] > 0 and holdings[index] < MAX_SHARES
+    ]
+    if not candidates or remaining_cash <= 0:
+        return quantities, remaining_cash
+
+    desired = {
+        index: min(
+            int(abs(actions[index]) * MAX_SHARES),
+            MAX_SHARES - int(holdings[index]),
+        )
+        for index in candidates
+    }
+    candidates = [index for index in candidates if desired[index] > 0]
+    if not candidates:
+        return quantities, remaining_cash
+
+    unit_cost = {
+        index: float(prices[index]) * (1 + TRANSACTION_COST)
+        for index in candidates
+    }
+    weights = {index: float(actions[index]) for index in candidates}
+    total_weight = sum(weights.values())
+
+    for index in candidates:
+        budget = remaining_cash * weights[index] / total_weight
+        quantities[index] = min(desired[index], int(budget / unit_cost[index]))
+
+    remaining_cash -= sum(
+        int(quantities[index]) * unit_cost[index]
+        for index in candidates
+    )
+
+    while True:
+        affordable = [
+            index
+            for index in candidates
+            if quantities[index] < desired[index]
+            and unit_cost[index] <= remaining_cash + 1e-9
+        ]
+        if not affordable:
+            break
+
+        index = min(
+            affordable,
+            key=lambda item: (
+                quantities[item] * unit_cost[item] / weights[item],
+                unit_cost[item],
+                item,
+            ),
+        )
+        quantities[index] += 1
+        remaining_cash -= unit_cost[index]
+
+    return quantities, max(remaining_cash, 0.0)
+
+
 def _load_tickers() -> list[str]:
     tickers: list[str] = []
     for line in TICKER_PATH.read_text(encoding="utf-8").splitlines():
@@ -492,20 +559,14 @@ class PipelineService:
             estimated_holdings[index] -= quantity
             quantities[index] = -quantity
 
-        for index in np.where(actions > HOLD_THRESHOLD)[0]:
-            if prices[index] <= 0:
-                continue
-            quantity = min(
-                int(abs(actions[index]) * MAX_SHARES),
-                MAX_SHARES - int(estimated_holdings[index]),
-            )
-            unit_cost = float(prices[index]) * (1 + TRANSACTION_COST)
-            quantity = min(quantity, int(remaining_cash / unit_cost))
-            if quantity <= 0:
-                continue
-            remaining_cash -= quantity * unit_cost
-            estimated_holdings[index] += quantity
-            quantities[index] = quantity
+        buy_quantities, remaining_cash = _allocate_proportional_buys(
+            actions,
+            prices,
+            estimated_holdings,
+            remaining_cash,
+        )
+        quantities += buy_quantities
+        estimated_holdings += buy_quantities
 
         rows = []
         for index, ticker in enumerate(self.tickers):
@@ -552,6 +613,7 @@ class PipelineService:
                 "hold_threshold": HOLD_THRESHOLD,
                 "position_cap": MAX_SHARES,
                 "transaction_cost": TRANSACTION_COST,
+                "buy_allocation": "action_score_proportional",
             },
             "disclaimer": "연구용 데모 · 실제 투자 주문 아님 · 수량은 t일 종가 기준 추정치",
         }

@@ -6,9 +6,10 @@
 
 1. [`SITE_OVERVIEW.md`](SITE_OVERVIEW.md): 비개발자 관점의 사이트 목적과 화면 구성
 2. 이 문서: 슬라이드 구조, 검증된 수치, 표현상의 주의점
-3. [`CONFERENCE_GUIDE.md`](CONFERENCE_GUIDE.md): 시연 순서, 종목 universe, 학습·추론 상세, 예상 질문
-4. [`../../README.md`](../../README.md): 환경, reward, 데이터 기간 등 구현 세부사항
-5. [`../DEPLOYMENT.md`](../DEPLOYMENT.md): 시연 운영자만 확인할 배포·비밀번호 설정
+3. [`ALLOCATION_POSTPROCESSING.md`](ALLOCATION_POSTPROCESSING.md): 모델 score와 발표용 예상 수량 후처리 구분
+4. [`CONFERENCE_GUIDE.md`](CONFERENCE_GUIDE.md): 시연 순서, 종목 universe, 학습·추론 상세, 예상 질문
+5. [`../../README.md`](../../README.md): 환경, reward, 데이터 기간 등 구현 세부사항
+6. [`../DEPLOYMENT.md`](../DEPLOYMENT.md): 시연 운영자만 확인할 배포·비밀번호 설정
 
 ## 한 문장 소개
 
@@ -86,7 +87,8 @@ Action은 종목별 `[-1, 1]` 연속값임. 데모는 `0.10` 초과를 매수, `
 - 데모의 50종목은 실행할 때마다 새로 선정되는 종목이 아니라 해당 PPO 체크포인트가 학습한 고정 universe임.
 - 저장소에는 최초 universe를 만든 시가총액·유동성 스크리닝 근거가 남아 있지 않음.
 - PPO는 고정 50종목 각각에 action score를 출력함.
-- 화면의 예상 주문 수량은 action score에 현금, 현재 보유량, 종목별 최대 500주, 거래비용 0.3%를 적용한 시뮬레이션 값임.
+- 화면의 예상 주문 수량은 매도 후 가용 현금을 양수 action score 비례로 분산하고, 현재 보유량, 종목별 최대 500주, 거래비용 0.3%를 적용한 시뮬레이션 값임.
+- 비례 배분은 고정 action index의 선착순 현금 소진을 피하기 위한 데모 후처리이며 PPO 원본 출력이나 학습 환경의 실제 주문 로직은 아님.
 - 실제 주문을 전송하지 않으며 투자 권유 서비스가 아님.
 
 ## 사용하면 안 되는 표현

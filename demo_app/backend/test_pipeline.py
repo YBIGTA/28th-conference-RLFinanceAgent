@@ -5,6 +5,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import numpy as np
+
 from demo_app.backend import pipeline
 from demo_app.backend.pipeline import get_pipeline_service
 
@@ -55,6 +57,54 @@ class PipelineServiceTest(unittest.TestCase):
                 holdings={"999999.KS": 1},
                 news_text="",
             )
+
+    def test_buy_cash_is_distributed_across_equal_scores(self):
+        actions = np.zeros(50, dtype=np.float32)
+        actions[:3] = 1.0
+        prices = np.full(50, 100_000.0, dtype=np.float32)
+        holdings = np.zeros(50, dtype=int)
+
+        quantities, remaining_cash = pipeline._allocate_proportional_buys(
+            actions,
+            prices,
+            holdings,
+            1_000_000,
+        )
+
+        np.testing.assert_array_equal(quantities[:3], [3, 3, 3])
+        self.assertGreaterEqual(remaining_cash, 0)
+
+    def test_buy_cash_follows_relative_action_scores(self):
+        actions = np.zeros(50, dtype=np.float32)
+        actions[0] = 1.0
+        actions[1] = 0.5
+        prices = np.full(50, 100_000.0, dtype=np.float32)
+        holdings = np.zeros(50, dtype=int)
+
+        quantities, _ = pipeline._allocate_proportional_buys(
+            actions,
+            prices,
+            holdings,
+            1_000_000,
+        )
+
+        np.testing.assert_array_equal(quantities[:2], [6, 3])
+
+    def test_buy_allocation_respects_position_cap(self):
+        actions = np.zeros(50, dtype=np.float32)
+        actions[0] = 1.0
+        prices = np.full(50, 10_000.0, dtype=np.float32)
+        holdings = np.zeros(50, dtype=int)
+        holdings[0] = pipeline.MAX_SHARES - 1
+
+        quantities, _ = pipeline._allocate_proportional_buys(
+            actions,
+            prices,
+            holdings,
+            1_000_000,
+        )
+
+        self.assertEqual(quantities[0], 1)
 
     def test_crawled_news_embeddings_are_cached(self):
         market_records = [{"title": "코스피 상승 마감"}]
