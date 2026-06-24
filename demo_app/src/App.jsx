@@ -73,10 +73,12 @@ export function App() {
   const [latestNews, setLatestNews] = useState(null);
   const [latestNewsLoading, setLatestNewsLoading] = useState(false);
   const [latestNewsError, setLatestNewsError] = useState("");
+  const [portfolioApplied, setPortfolioApplied] = useState(false);
 
   async function requestInference(selectedMode, values = {}) {
     setLoading(true);
     setError("");
+    setPortfolioApplied(false);
     try {
       const holdings = JSON.parse(values.holdingsText ?? holdingsText);
       const response = await fetch("/api/infer", {
@@ -196,6 +198,19 @@ export function App() {
     } finally {
       setLatestNewsLoading(false);
     }
+  }
+
+  function applyResultToInputs() {
+    if (!result?.rows || !result?.summary) return;
+    const nextHoldings = Object.fromEntries(
+      result.rows
+        .filter((row) => Number(row.estimated_shares) > 0)
+        .map((row) => [row.ticker, Number(row.estimated_shares)]),
+    );
+    const nextCash = Math.max(0, Math.floor(Number(result.summary.estimated_cash) || 0));
+    setCash(String(nextCash));
+    setHoldingsText(JSON.stringify(nextHoldings, null, 2));
+    setPortfolioApplied(true);
   }
 
   if (authStatus !== "ready") {
@@ -351,6 +366,20 @@ export function App() {
         >
           {loading ? "모델 실행 중" : "모델 실행"}
         </button>
+
+        <button
+          className="apply-result-button"
+          type="button"
+          disabled={loading || !result}
+          onClick={applyResultToInputs}
+        >
+          결과를 다음 입력으로 적용
+        </button>
+        <p className="apply-result-note">
+          {portfolioApplied
+            ? "예상 현금과 체결 후 보유 수량을 입력란에 반영했습니다."
+            : "현재 결과의 예상 현금·보유량을 다음 실행 입력으로 복사합니다."}
+        </p>
 
         {error && <p className="error-message">{error}</p>}
         <p className="run-meta">
