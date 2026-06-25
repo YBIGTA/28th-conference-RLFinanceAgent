@@ -20,5 +20,8 @@ dist/
 news_crawler/output/
 demo_app/backend/runtime/
 
+# Local presentation notes
+demo_app/docs/*.md
+
 # Local experiment workspace
 in_vessl/
