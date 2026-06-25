@@ -1,0 +1,14 @@
+beautifulsoup4==4.12.3
+fastapi==0.78.0
+gymnasium==1.2.3
+joblib==1.4.2
+numpy==2.4.1
+openai==2.43.0
+pandas==2.2.3
+python-dotenv==1.0.0
+requests==2.32.3
+scikit-learn==1.6.1
+stable-baselines3==2.8.0
+stockstats==0.6.8
+uvicorn==0.48.0
+yfinance==0.2.66

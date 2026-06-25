@@ -201,6 +201,29 @@ pip install -r requirements.txt
 
 ---
 
+## PPO 데모 대시보드
+
+`demo_app/`은 `feature/demo`의 50종목 best PPO 모델을 서비스하는 FastAPI + 정적 프론트엔드 애플리케이션임.
+
+- 샘플 모드: 모델에 저장된 실제 1,467차원 관측값으로 재현함
+- 최신 모드: 장 마감 후 Yahoo Finance, 네이버 최신 뉴스 크롤러, Upstage, 공용 4,096→16 Autoencoder, PPO를 연결함
+- 뉴스 캐시: 고정 50종목의 `stock_news.csv`와 시장 키워드의 `market_news.csv`를 거래일별로 저장함
+- 출력: 매수·보유·매도 점수, t일 종가 기준 예상 수량, 50종목 전체 표
+- 제외: 실제 증권 주문, 수익 보장, 모델이 제공하지 않는 추천 사유 생성
+
+```bash
+cd demo_app
+npm install
+npm run build
+cd ..
+python -m demo_app.backend.app
+```
+
+상세 입력 형식과 제약은 [`demo_app/README.md`](demo_app/README.md)에 정리함.
+크롤러 단독 실행 방법은 [`news_crawler/README.md`](news_crawler/README.md)에 정리함.
+
+---
+
 ## 실행
 
 ### 기본 실행
@@ -277,6 +300,9 @@ RLFinanceAgent/
 │   ├── env_kospi.py                 Gym 환경 (MDP 구현)
 │   ├── trainer.py                   SB3 학습 + 평가
 │   └── backtest.py                  MinVar 등 전통 전략 비교
+├── demo_app/                         PPO FastAPI + 대시보드
+│   ├── backend/                      실제 모델·scaler·임베딩 API
+│   └── src/                          Analyst Console 프론트엔드
 └── notebooks/
     └── kospi_finrl_pipeline.ipynb
 ```

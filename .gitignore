@@ -1,1 +1,27 @@
 .DS_Store
+__pycache__/
+*.pyc
+.env
+venv
+.venv
+.venv*
+
+# Python tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Frontend tooling and build outputs
+node_modules/
+dist/
+.npm-cache/
+
+# News crawler runtime outputs
+news_crawler/output/
+demo_app/backend/runtime/
+
+# Local presentation notes
+demo_app/docs/*.md
+
+# Local experiment workspace
+in_vessl/
